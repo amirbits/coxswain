@@ -156,9 +156,11 @@ async function untrackedDiff(root: string): Promise<string> {
   try {
     const r = await git(root, ["ls-files", "--others", "--exclude-standard", "-z"]);
     if (!r.ok) return "";
-    const files = r.stdout.split("\0").filter((f) => keepPath(f)).slice(0, 100);
+    const files = r.stdout.split("\0").filter((f) => keepPath(f));
+    if (files.length > 100) console.warn(`helm: ${files.length} untracked files; diffing the first 100 (use 'git add' to stage the rest).`);
+    const capped = files.slice(0, 100);
     let out = "";
-    for (const f of files) {
+    for (const f of capped) {
       try {
         if (statSync(join(root, f)).size > 512 * 1024) continue;
       } catch {

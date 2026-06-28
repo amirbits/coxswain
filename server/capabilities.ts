@@ -2,18 +2,13 @@
 // API, and the CLI (DESIGN.md §5). Diff modes are normalized here.
 
 import { diffAll, status } from "./git";
+import { parseMode } from "./mode";
 import { Registry } from "./registry";
 import { decorateThreads } from "./review";
 import type { Store } from "./store";
-import type { DiffMode } from "./types";
 import { getFile, getWorkspace } from "./workspace";
 
-function asMode(m: any): DiffMode {
-  if (m && typeof m === "object" && (m.kind === "working" || m.kind === "branch" || m.kind === "ref")) {
-    return { kind: m.kind, ref: m.ref ?? null };
-  }
-  return { kind: "working" };
-}
+const asMode = (m: any) => parseMode(m);
 
 export function buildRegistry(deps: { root: string; store: Store }): Registry {
   const { root, store } = deps;
@@ -27,6 +22,12 @@ export function buildRegistry(deps: { root: string; store: Store }): Registry {
   reg.register("writeIntent", "Write INTENT.md (write-through)", async (a: any) => {
     await store.writeIntent(String(a.content ?? ""));
     return store.readIntent();
+  });
+  reg.register("writeFile", "Write a repo file (write-through, never commits)", async (a: any) => {
+    const path = String(a.path ?? "");
+    if (!path) throw new Error("path required");
+    await store.writeFile(path, String(a.content ?? ""));
+    return { ok: true, path };
   });
 
   // Threads

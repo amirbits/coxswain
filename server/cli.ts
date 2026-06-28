@@ -4,7 +4,8 @@
 
 import { resolve } from "node:path";
 import { buildRegistry } from "./capabilities";
-import { repoRoot } from "./git";
+import { readFileContent, repoRoot } from "./git";
+import { parseMode } from "./mode";
 import { Store } from "./store";
 import type { DecoratedThread, DiffMode, FilePayload, Suggestion, Workspace } from "./types";
 
@@ -14,7 +15,8 @@ type Flags = {
   all?: boolean;
   stdin?: boolean;
   diff?: boolean;
-  base?: string;
+  replaces?: string; // suggest: the exact text a proposal replaces
+  end?: number; // comment: end line of the range
   body?: string;
   file?: string;
   dir?: string;
@@ -35,10 +37,13 @@ const HELP = `helm — agent + human CLI over the review surface
   helm diff [path]           diff (whole repo, or one file)
   helm comments [--all]      list review threads (default: open + outdated)
   helm show <id>             one thread in full (messages + any suggestion)
+  helm comment <path> <line> open a thread as the agent (--end <line> for a range;
+                               --stdin / --file for the body). Captures the anchored
+                               text as context so the thread can go outdated.
   helm reply <id> <text>     append a reply, as the agent
   helm suggest <id> <text>   propose a replacement for the thread's region
                                --stdin / --file  read the new text
-                               --base "<text>"   set exactly what it replaces
+                               --replaces "<text>"  set exactly what it replaces
   helm apply <id>            apply the thread's pending suggestion (write-through)
   helm dismiss <id>          dismiss it
   helm resolve | reopen <id> change thread status
@@ -77,7 +82,7 @@ export async function runCli(rawArgs: string[]): Promise<number> {
       case "context": {
         const ws = await call<Workspace>("workspace", { mode });
         const intent = await call<{ content: string; exists: boolean }>("getIntent", {});
-        emit(fmtContext(ws, intent), { repo: ws.repo, mode: ws.mode, intent, tree: ws.tree.filter((e) => e.status || e.open), openThreads: ws.threads.filter((t) => t.effectiveStatus !== "resolved") });
+        emit(fmtContext(ws, intent), { repo: ws.repo, mode: ws.mode, intent, tree: ws.tree.filter((e) => e.status || e.open || e.outdated), openThreads: ws.threads.filter((t) => t.effectiveStatus !== "resolved") });
         return 0;
       }
       case "status": {
@@ -128,6 +133,23 @@ export async function runCli(rawArgs: string[]): Promise<number> {
         emit(fmtThread(t), t);
         return 0;
       }
+      case "comment": {
+        const path = requireArg(flags, 0, "path");
+        const startLine = Number(requireArg(flags, 1, "line"));
+        if (!Number.isInteger(startLine) || startLine < 1) throw new Error("line must be a positive integer");
+        const endLine = flags.end && flags.end > 0 ? flags.end : startLine;
+        const text = flags._.slice(2).join(" ") || (flags.stdin ? await readStdin() : flags.file ? (await Bun.file(flags.file).text()).replace(/\n$/, "") : "");
+        if (!text) throw new Error("comment text is required (positional, --stdin, or --file)");
+        // Capture the anchored text as context so the thread can go outdated and
+        // locates inline — parity with UI-created threads.
+        const fc = await readFileContent(root, path);
+        if (!fc.exists) throw new Error(`no such file: ${path}`);
+        if (fc.kind === "binary") throw new Error(`cannot comment on a binary file: ${path}`);
+        const context = fc.content.split("\n").slice(startLine - 1, endLine).join("\n");
+        const t = await call<DecoratedThread>("addComment", { path, startLine, endLine, text, author: "agent", context });
+        emit(`commented on ${path}:${startLine}${endLine !== startLine ? `–${endLine}` : ""} (${short(t.id)})`, t);
+        return 0;
+      }
       case "reply": {
         const id = await resolveId(store, requireArg(flags, 0, "id"));
         const text = flags._.slice(1).join(" ") || (flags.stdin ? await readStdin() : "");
@@ -144,7 +166,7 @@ export async function runCli(rawArgs: string[]): Promise<number> {
             ? (await Bun.file(flags.file).text()).replace(/\n$/, "")
             : flags._.slice(1).join(" ");
         if (!newText) throw new Error("new text is required (positional, --stdin, or --file)");
-        const t = await call<DecoratedThread>("suggestEdit", { id, newText, base: flags.base, body: flags.body });
+        const t = await call<DecoratedThread>("suggestEdit", { id, newText, base: flags.replaces, body: flags.body });
         const s = lastSuggestion(t);
         emit(`suggestion added to ${short(id)}\n${s ? fmtSuggestion(s) + "\n" : ""}apply: helm apply ${short(id)}`, t);
         return 0;
@@ -188,7 +210,8 @@ function parseFlags(args: string[]): Flags {
     else if (a === "--all") f.all = true;
     else if (a === "--stdin") f.stdin = true;
     else if (a === "--diff") f.diff = true;
-    else if (a === "--base") f.base = args[++i];
+    else if (a === "--replaces") f.replaces = args[++i];
+    else if (a === "--end") f.end = Number(args[++i]);
     else if (a === "--body") f.body = args[++i];
     else if (a === "--file") f.file = args[++i];
     else if (a === "--dir") f.dir = args[++i];
@@ -202,9 +225,9 @@ function parseFlags(args: string[]): Flags {
 }
 
 function modeFromFlags(f: Flags): DiffMode {
-  if (f.branch) return { kind: "branch", ref: f.branch };
-  const ref = f.ref || f.commit || f.tag || f.base;
-  if (ref) return { kind: f.base || f.branch ? "branch" : "ref", ref };
+  if (f.branch) return parseMode({ kind: "branch", ref: f.branch });
+  const ref = f.ref || f.commit || f.tag;
+  if (ref) return parseMode({ kind: "ref", ref });
   return { kind: "working" };
 }
 

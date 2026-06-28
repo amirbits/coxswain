@@ -6,6 +6,7 @@
 import { extname, join } from "node:path";
 import { getEmbedded, hasEmbedded } from "./assets";
 import { buildRegistry } from "./capabilities";
+import { parseMode } from "./mode";
 import { SSEHub } from "./sse";
 import { Store } from "./store";
 import type { DiffMode } from "./types";
@@ -30,6 +31,11 @@ export async function startServer(opts: ServerOptions) {
 
   const watcher = startWatcher(root, (paths) => sse.broadcast({ type: "change", paths }));
 
+  // The --base flag selects the PR-style branch diff at boot (DESIGN.md §12).
+  const bootMode: DiffMode = opts.defaultBase
+    ? parseMode({ kind: "branch", ref: opts.defaultBase })
+    : { kind: "working" };
+
   const server = Bun.serve({
     port: opts.port,
     hostname: "127.0.0.1",
@@ -41,6 +47,8 @@ export async function startServer(opts: ServerOptions) {
       if (pathname === "/events") return sse.handler();
 
       if (pathname === "/api/health") return json({ ok: true, root });
+
+      if (pathname === "/api/boot") return json({ mode: bootMode, root });
 
       if (pathname === "/api/registry") return json(registry.list());
 
@@ -131,11 +139,7 @@ async function serveStatic(pathname: string): Promise<Response> {
 }
 
 function modeFromQuery(url: URL): DiffMode {
-  const kind = url.searchParams.get("mode");
-  const ref = url.searchParams.get("ref");
-  if (kind === "branch") return { kind: "branch", ref };
-  if (kind === "ref") return { kind: "ref", ref };
-  return { kind: "working" };
+  return parseMode({ kind: url.searchParams.get("mode"), ref: url.searchParams.get("ref") });
 }
 
 function json(data: unknown, statusCode = 200): Response {

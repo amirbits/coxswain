@@ -57,7 +57,8 @@ helm diff [path]        # diff (whole repo or one file); --branch <ref> / --ref 
 helm comments           # list open review threads (--all to include resolved)
 helm show <id>          # one thread in full (id = any unique prefix, like git)
 helm reply <id> "…"     # answer a thread, as the agent
-helm suggest <id> "…"   # propose a replacement for the thread's region (--stdin / --base)
+helm comment <path> <line> # open a thread as the agent (--end <line> for a range; --stdin / --file for the body)
+helm suggest <id> "…"   # propose a replacement for the thread's region (--stdin / --replaces)
 helm apply <id>         # apply that suggestion to the file (you still commit to accept)
 helm resolve <id>       # mark it done
 helm <verb> --json      # structured output, for parsing

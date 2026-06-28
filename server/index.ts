@@ -12,7 +12,7 @@ import { startServer } from "./server";
 // registry; bare `helm` serves the UI (DESIGN.md §5, §11).
 const VERBS = new Set([
   "context", "status", "intent", "tree", "file", "diff", "comments", "show",
-  "reply", "suggest", "apply", "dismiss", "resolve", "reopen", "help",
+  "reply", "suggest", "apply", "dismiss", "resolve", "reopen", "comment", "help",
 ]);
 const firstArg = Bun.argv[2];
 if (firstArg && !firstArg.startsWith("-")) {
