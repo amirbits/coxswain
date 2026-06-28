@@ -7,9 +7,10 @@ import { extname, join } from "node:path";
 import { getEmbedded, hasEmbedded } from "./assets";
 import { buildRegistry } from "./capabilities";
 import { SSEHub } from "./sse";
-import { getState } from "./state";
 import { Store } from "./store";
+import type { DiffMode } from "./types";
 import { startWatcher } from "./watcher";
+import { getFile, getWorkspace } from "./workspace";
 
 export type ServerOptions = {
   root: string;
@@ -43,10 +44,19 @@ export async function startServer(opts: ServerOptions) {
 
       if (pathname === "/api/registry") return json(registry.list());
 
-      if (pathname === "/api/state") {
-        const base = url.searchParams.get("base") || opts.defaultBase;
+      if (pathname === "/api/workspace") {
         try {
-          return json(await getState(root, store, base));
+          return json(await getWorkspace(root, store, modeFromQuery(url)));
+        } catch (e) {
+          return json({ error: errMsg(e) }, 400);
+        }
+      }
+
+      if (pathname === "/api/file") {
+        const path = url.searchParams.get("path");
+        if (!path) return json({ error: "path required" }, 400);
+        try {
+          return json(await getFile(root, store, path, modeFromQuery(url)));
         } catch (e) {
           return json({ error: errMsg(e) }, 400);
         }
@@ -118,6 +128,14 @@ async function serveStatic(pathname: string): Promise<Response> {
     "Helm frontend not built. Run `bun run dev` (Vite) or `bun run build`.",
     { status: 404 },
   );
+}
+
+function modeFromQuery(url: URL): DiffMode {
+  const kind = url.searchParams.get("mode");
+  const ref = url.searchParams.get("ref");
+  if (kind === "branch") return { kind: "branch", ref };
+  if (kind === "ref") return { kind: "ref", ref };
+  return { kind: "working" };
 }
 
 function json(data: unknown, statusCode = 200): Response {

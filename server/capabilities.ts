@@ -1,78 +1,59 @@
-// Registers the concrete v1 capabilities onto a Registry. These are the verbs
-// the palette/NL bar/agent share. Each is a thin, deterministic binding over the
-// git adapter and the file store.
+// The v1 capabilities, registered onto a Registry. Shared by the UI, the HTTP
+// API, and the CLI (DESIGN.md §5). Diff modes are normalized here.
 
-import { getDiff, status } from "./git";
+import { diffAll, status } from "./git";
 import { Registry } from "./registry";
 import { decorateThreads } from "./review";
-import { getState } from "./state";
 import type { Store } from "./store";
-import type { Anchor, Author } from "./types";
+import type { DiffMode } from "./types";
+import { getFile, getWorkspace } from "./workspace";
+
+function asMode(m: any): DiffMode {
+  if (m && typeof m === "object" && (m.kind === "working" || m.kind === "branch" || m.kind === "ref")) {
+    return { kind: m.kind, ref: m.ref ?? null };
+  }
+  return { kind: "working" };
+}
 
 export function buildRegistry(deps: { root: string; store: Store }): Registry {
   const { root, store } = deps;
   const reg = new Registry();
 
-  reg.register("getState", "Project the full app state from the working tree", (a: { base?: string }) =>
-    getState(root, store, a.base ?? null),
-  );
-
-  reg.register("showDiff", "Get the diff (working tree, or base...HEAD)", (a: { base?: string }) =>
-    getDiff(root, a.base ?? null),
-  );
-
+  // Projections
+  reg.register("workspace", "Explorer tree + repo info + all threads", (a: any) => getWorkspace(root, store, asMode(a?.mode)));
+  reg.register("file", "A file's current content + its per-mode diff", (a: any) => getFile(root, store, String(a.path), asMode(a?.mode)));
+  reg.register("showDiff", "Whole-repo diff for a mode", (a: any) => diffAll(root, asMode(a?.mode)));
   reg.register("getIntent", "Read INTENT.md", () => store.readIntent());
-
-  reg.register("writeIntent", "Write INTENT.md (write-through edit)", async (a: { content: string }) => {
+  reg.register("writeIntent", "Write INTENT.md (write-through)", async (a: any) => {
     await store.writeIntent(String(a.content ?? ""));
     return store.readIntent();
   });
 
-  reg.register("listThreads", "List review threads, decorated with drift state", async () => {
-    const [intent, diff, threads] = await Promise.all([
-      store.readIntent(),
-      getDiff(root, null),
-      store.listThreads(),
-    ]);
-    return decorateThreads(threads, { intent, diff });
-  });
-
-  reg.register(
-    "addComment",
-    "Create a review thread anchored to a region",
-    (a: { anchor: Anchor; text: string; author?: Author; context?: string }) =>
-      store.createThread(a.anchor, a.text, a.author ?? "human", a.context),
-  );
-
-  reg.register("replyComment", "Append a reply to a thread", (a: { id: string; text: string; author?: Author }) =>
-    store.appendMessage(a.id, a.author ?? "human", a.text),
-  );
-
-  reg.register("resolveComment", "Resolve a thread", (a: { id: string }) => store.setStatus(a.id, "resolved"));
-
-  reg.register("reopenComment", "Reopen a resolved thread", (a: { id: string }) => store.setStatus(a.id, "open"));
-
-  reg.register("getThread", "Get one thread, decorated with drift state", async (a: { id: string }) => {
+  // Threads
+  reg.register("listThreads", "List review threads, decorated", async () => decorateThreads(await store.listThreads(), root));
+  reg.register("getThread", "One thread, decorated", async (a: any) => {
     const t = await store.getThread(a.id);
     if (!t) throw new Error(`thread not found: ${a.id}`);
-    const [intent, diff] = await Promise.all([store.readIntent(), getDiff(root, null)]);
-    return decorateThreads([t], { intent, diff })[0];
+    return (await decorateThreads([t], root))[0];
   });
-
-  reg.register(
-    "suggestEdit",
-    "Propose a non-destructive replacement for a thread's anchored region",
-    (a: { id: string; newText: string; base?: string; body?: string; author?: Author }) =>
-      store.addSuggestion(a.id, { newText: a.newText, base: a.base, body: a.body, author: a.author ?? "agent" }),
+  reg.register("addComment", "Create a thread anchored to file content", (a: any) =>
+    store.createThread(
+      { path: String(a.path), startLine: Number(a.startLine) || 0, endLine: Number(a.endLine) || Number(a.startLine) || 0 },
+      String(a.text),
+      a.author ?? "human",
+      a.context,
+    ),
   );
+  reg.register("replyComment", "Append a reply", (a: any) => store.appendMessage(a.id, a.author ?? "human", a.text));
+  reg.register("resolveComment", "Resolve a thread", (a: any) => store.setStatus(a.id, "resolved"));
+  reg.register("reopenComment", "Reopen a thread", (a: any) => store.setStatus(a.id, "open"));
 
-  reg.register("applySuggestion", "Apply a thread's pending suggestion to its file (write-through)", (a: { id: string }) =>
-    store.applySuggestion(a.id),
+  // Suggestions
+  reg.register("suggestEdit", "Propose a replacement for a thread's region", (a: any) =>
+    store.addSuggestion(a.id, { newText: a.newText, base: a.base, body: a.body, author: a.author ?? "agent" }),
   );
-
-  reg.register("dismissSuggestion", "Dismiss a thread's pending suggestion", (a: { id: string }) =>
-    store.dismissSuggestion(a.id),
-  );
+  reg.register("applySuggestion", "Apply a thread's suggestion (write-through)", (a: any) => store.applySuggestion(a.id));
+  reg.register("dismissSuggestion", "Dismiss a thread's suggestion", (a: any) => store.dismissSuggestion(a.id));
 
   reg.register("repoStatus", "Branch + change + review summary", async () => {
     const [st, threads] = await Promise.all([status(root), store.listThreads()]);

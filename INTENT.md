@@ -40,12 +40,15 @@ Helm **watches** the filesystem and git and renders live. It does **not** drive 
 agent yet. You run Claude Code yourself; you steer it by leaving review comments; the
 agent reads `.reviews/`, edits files, and the UI repaints live.
 
-- **Intent view** — renders this file. Reviewable.
-- **Diff view** — renders the uncommitted diff (or `base...HEAD`). Reviewable.
-- **Comments** — select a region, leave a thread; it persists as a file under `.reviews/`.
+- **Explorer + file view** — browse the project and read any file as-is (this one
+  rendered as markdown). Reviewable.
+- **Diff view** — the selected file's diff in three modes: the working tree
+  (uncommitted), vs a branch (merge-request style), or vs a commit/tag. Reviewable.
+- **Comments** — select a region in any view; the thread persists as a file under
+  `.reviews/` and rides the file's content across every lens.
 
-Driving the agent, a code-file view, multi-workspace `git worktree` orchestration, and
-a command palette are designed but deliberately deferred.
+Driving the agent, multi-workspace `git worktree` orchestration, and a command palette
+are designed but deliberately deferred.
 
 ## Agents steer through the surface, not around it
 

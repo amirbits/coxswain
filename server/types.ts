@@ -1,61 +1,28 @@
-// Shared types for Helm's server. These mirror the Reviewable contract and the
-// source-of-truth model described in DESIGN.md §3–4.
+// Shared types. v2 model (DESIGN.md §12): comments anchor to file *content*, so
+// one thread renders in every lens (file view, any diff, the panel). The old
+// per-view anchor (intent quote / diff lines) is read via a compat shim in
+// store.ts and normalized to this shape.
 
-export type ViewName = "intent" | "diff" | "code";
 export type Author = "human" | "agent";
-
-// Stored status of a thread. "outdated" is *derived* at read time (see review.ts),
-// never persisted — persisting it would churn files on every drift.
 export type ThreadStatus = "open" | "resolved";
 export type EffectiveStatus = ThreadStatus | "outdated";
 
-// Locators -------------------------------------------------------------------
-
-// Line-based anchor, used by the diff (and later, code) views.
-export type LineRange = {
-  kind: "lines";
-  path: string;
-  side?: "old" | "new"; // which side of the diff the lines belong to (default "new")
-  startLine: number;
+// A comment anchors to a file + a line hint into the *current* file. `context`
+// (on the thread) is the exact anchored text; drift + locating are content-based,
+// the line numbers are hints for disambiguation and scroll.
+export type Anchor = {
+  path: string; // repo-relative, e.g. "INTENT.md", "src/x.ts"
+  startLine: number; // 1-based hint into the current file (0 if unknown)
   endLine: number;
 };
 
-// Content-based anchor, used by the intent (markdown) view. Markdown has no
-// stable line identity across edits, so we anchor by quoted text + context.
-export type TextAnchor = {
-  kind: "text";
-  quote: string;
-  prefix?: string;
-  suffix?: string;
-};
-
-export type Locator = LineRange | TextAnchor;
-
-export type Anchor = {
-  view: ViewName;
-  version: string; // commit SHA, or "working" for the live tree
-  locator: Locator;
-};
-
-// Threads --------------------------------------------------------------------
-
 export type SuggestionStatus = "proposed" | "applied" | "dismissed";
-
-// A proposed, non-destructive replacement for a thread's anchored region, living
-// on the message that carries it. Applying it write-throughs to the file
-// (DESIGN.md §11). `base` is the exact current text to replace — drift-safe and
-// free of diff-marker / markdown-source ambiguity, because the agent (which read
-// the file) supplies it.
-export type Suggestion = {
-  base: string;
-  newText: string;
-  status: SuggestionStatus;
-};
+export type Suggestion = { base: string; newText: string; status: SuggestionStatus };
 
 export type Message = {
   author: Author;
   body: string;
-  ts: string; // ISO 8601
+  ts: string;
   suggestion?: Suggestion;
 };
 
@@ -64,49 +31,69 @@ export type Thread = {
   anchor: Anchor;
   status: ThreadStatus;
   thread: Message[];
-  // The text that was anchored at creation time. Used purely for drift
-  // detection; it is not part of the anchor's identity.
   context?: string;
 };
+
+// Where the context currently sits in the file (for inline highlight); null when
+// the content has drifted away (→ outdated).
+export type Located = { startLine: number; endLine: number } | null;
 
 export type DecoratedThread = Thread & {
   outdated: boolean;
   effectiveStatus: EffectiveStatus;
+  located: Located;
 };
 
-// Payloads -------------------------------------------------------------------
+// Files & diff modes -------------------------------------------------------
 
-export type DiffPayload = {
-  raw: string; // unified diff text (empty string === no changes)
-  base: string | null; // base ref for PR-style diff, else null (working tree)
-  mode: "working" | "branch";
-  head: string | null; // current HEAD sha (null when the repo has no commits)
+export type FileKind = "markdown" | "text" | "binary";
+export type ChangeStatus = "A" | "M" | "D" | "R" | "C" | null;
+
+// A diff is diff(base → target). The three submodes are presets:
+//  working → HEAD vs working tree (uncommitted, incl. untracked)
+//  branch  → merge-base(ref, HEAD)…HEAD  (merge-request style, three-dot)
+//  ref     → ref..HEAD                    (vs a commit or tag, two-dot)
+export type DiffMode = { kind: "working" | "branch" | "ref"; ref?: string | null };
+
+export type TreeEntry = {
+  path: string;
+  status: ChangeStatus; // change in the active mode
+  open: number; // open comment count
+  outdated: number;
 };
 
-export type IntentPayload = {
-  content: string;
+export type RepoInfo = {
+  root: string;
+  name: string;
+  branch: string;
+  head: string | null;
+  refs: { branches: string[]; tags: string[] };
+};
+
+export type Workspace = {
+  repo: RepoInfo;
+  mode: DiffMode;
+  tree: TreeEntry[];
+  threads: DecoratedThread[];
+};
+
+export type FilePayload = {
+  path: string;
   exists: boolean;
-  path: string; // "INTENT.md"
+  kind: FileKind;
+  content: string;
+  diff: string; // per-file diff for the active mode ("" if none)
+  status: ChangeStatus;
 };
+
+export type DiffPayload = { raw: string; mode: DiffMode; head: string | null };
+export type IntentPayload = { content: string; exists: boolean; path: string };
 
 export type RepoStatusFile = { path: string; index: string; worktree: string };
-
 export type RepoStatus = {
   branch: string;
   head: string | null;
   ahead: number;
   behind: number;
   files: RepoStatusFile[];
-  isRepo: boolean;
-};
-
-export type AppState = {
-  repoRoot: string;
-  repoName: string;
-  branch: string;
-  head: string | null;
-  status: RepoStatus;
-  intent: IntentPayload;
-  diff: DiffPayload;
-  threads: DecoratedThread[];
 };

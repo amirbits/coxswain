@@ -330,3 +330,44 @@ A suggestion is a normal message that also carries a proposed replacement:
   the diff. Two clean modes: **suggest** (scoped, non-destructive, apply-on-click) vs
   **edit** (direct, you commit/restore). Both end at the same boundary: your commit.
 - `apply` never commits, and the CLI exposes no commit verb.
+
+## 12. File-centric views + content anchors (v2)
+
+Generalizes the two fixed lenses (intent, diff) into a file-centric workspace — the
+code-file view plus a richer diff, on a unified anchor model.
+
+### Views
+- **Explorer** — the project file tree, each file decorated with its change status in
+  the active diff mode and a comment badge. `INTENT.md` is pinned at the top.
+- **File view** — the selected file as-is: markdown rendered (with a raw toggle), else
+  a line-numbered code view. Reviewable (gutter click / shift-range / text select).
+- **Diff view** — the selected file's diff for the active mode. Reviewable.
+- Intent is no longer a separate lens — it's the file view of `INTENT.md`.
+
+### Diff modes — `diff(base → target)`
+- **working** — HEAD vs the working tree (uncommitted, incl. untracked).
+- **branch** — `ref...HEAD` (merge-request style, three-dot).
+- **ref** — `ref..HEAD` (vs a commit or tag).
+
+One server pair `diffAll/diffFile({kind, ref})`; the UI mode bar selects the preset.
+
+### Content anchors (the keystone)
+A comment anchors to `{ path, startLine, endLine }` + the captured `context` text —
+*not* to diff coordinates. So one thread renders in every lens: highlighted in the file
+view, overlaid on any diff whose current hunks contain that text, in the Review panel,
+and as an Explorer badge. "Outdated" and the live inline location are found by searching
+the current file for `context` (markdown-formatting tolerant). Older per-view anchors
+load via a compat shim in `store.ts`.
+
+### Comments & suggestions across modes
+- The click gesture is identical in the file view and in every diff submode; a comment
+  is **not** bound to a mode.
+- Suggestions always operate on **current file state** (`base` = current text), so they
+  are mode-independent; Apply write-throughs to the working file.
+- Deleted (old-side) diff lines aren't commentable in v1 (no current-file content to
+  anchor to) — deferred.
+
+### Agent / CLI
+New read verbs `helm tree` (explorer) and `helm file <path>`; `helm diff [path]` gains
+`--branch <ref>` / `--ref|--tag <r>`. reply/suggest/apply are unchanged. The agent's
+model is simply "file + region."

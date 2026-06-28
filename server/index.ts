@@ -11,7 +11,7 @@ import { startServer } from "./server";
 // Subcommands (the agent CLI) are a fourth front door onto the function
 // registry; bare `helm` serves the UI (DESIGN.md §5, §11).
 const VERBS = new Set([
-  "context", "status", "intent", "diff", "comments", "show",
+  "context", "status", "intent", "tree", "file", "diff", "comments", "show",
   "reply", "suggest", "apply", "dismiss", "resolve", "reopen", "help",
 ]);
 const firstArg = Bun.argv[2];

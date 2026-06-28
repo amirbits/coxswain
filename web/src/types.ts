@@ -1,49 +1,17 @@
-// Mirror of the server's wire types (server/types.ts). Kept as a hand copy
-// rather than a shared package — the surface is small and the two tsconfigs are
-// separate.
+// Mirror of the server's v2 wire types (server/types.ts).
 
-export type ViewName = "intent" | "diff" | "code";
 export type Author = "human" | "agent";
 export type ThreadStatus = "open" | "resolved";
 export type EffectiveStatus = ThreadStatus | "outdated";
 
-export type LineRange = {
-  kind: "lines";
-  path: string;
-  side?: "old" | "new";
-  startLine: number;
-  endLine: number;
-};
-
-export type TextAnchor = {
-  kind: "text";
-  quote: string;
-  prefix?: string;
-  suffix?: string;
-};
-
-export type Locator = LineRange | TextAnchor;
-
-export type Anchor = {
-  view: ViewName;
-  version: string;
-  locator: Locator;
-};
+export type Anchor = { path: string; startLine: number; endLine: number };
 
 export type SuggestionStatus = "proposed" | "applied" | "dismissed";
+export type Suggestion = { base: string; newText: string; status: SuggestionStatus };
 
-export type Suggestion = {
-  base: string;
-  newText: string;
-  status: SuggestionStatus;
-};
+export type Message = { author: Author; body: string; ts: string; suggestion?: Suggestion };
 
-export type Message = {
-  author: Author;
-  body: string;
-  ts: string;
-  suggestion?: Suggestion;
-};
+export type Located = { startLine: number; endLine: number } | null;
 
 export type DecoratedThread = {
   id: string;
@@ -53,35 +21,39 @@ export type DecoratedThread = {
   context?: string;
   outdated: boolean;
   effectiveStatus: EffectiveStatus;
+  located: Located;
 };
 
-export type DiffPayload = {
-  raw: string;
-  base: string | null;
-  mode: "working" | "branch";
-  head: string | null;
-};
+export type FileKind = "markdown" | "text" | "binary";
+export type ChangeStatus = "A" | "M" | "D" | "R" | "C" | null;
 
-export type IntentPayload = { content: string; exists: boolean; path: string };
+export type DiffMode = { kind: "working" | "branch" | "ref"; ref?: string | null };
 
-export type RepoStatusFile = { path: string; index: string; worktree: string };
+export type TreeEntry = { path: string; status: ChangeStatus; open: number; outdated: number };
 
-export type RepoStatus = {
+export type RepoInfo = {
+  root: string;
+  name: string;
   branch: string;
   head: string | null;
-  ahead: number;
-  behind: number;
-  files: RepoStatusFile[];
-  isRepo: boolean;
+  refs: { branches: string[]; tags: string[] };
 };
 
-export type AppState = {
-  repoRoot: string;
-  repoName: string;
-  branch: string;
-  head: string | null;
-  status: RepoStatus;
-  intent: IntentPayload;
-  diff: DiffPayload;
+export type Workspace = {
+  repo: RepoInfo;
+  mode: DiffMode;
+  tree: TreeEntry[];
   threads: DecoratedThread[];
 };
+
+export type FilePayload = {
+  path: string;
+  exists: boolean;
+  kind: FileKind;
+  content: string;
+  diff: string;
+  status: ChangeStatus;
+};
+
+// What a view hands up when the human leaves a comment.
+export type NewComment = { path: string; startLine: number; endLine: number; content: string };

@@ -1,16 +1,25 @@
-// Thin client over the server's two front doors: GET /api/state (the full
-// projection) and POST /api/call (the function registry). Live updates arrive
-// via the /events SSE stream — every "change" just tells us to re-project.
+// Client over the server's front doors: GET /api/workspace (explorer + threads),
+// GET /api/file (one file's content + diff), POST /api/call (the registry), and
+// the /events SSE stream. Every change just re-projects.
 
-import type { AppState } from "./types";
+import type { DiffMode, FilePayload, Workspace } from "./types";
 
-export async function fetchState(base: string | null): Promise<AppState> {
-  const q = base ? `?base=${encodeURIComponent(base)}` : "";
-  const res = await fetch(`/api/state${q}`);
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.error || `state failed (${res.status})`);
-  }
+function modeParams(mode: DiffMode): string {
+  const p = new URLSearchParams();
+  p.set("mode", mode.kind);
+  if (mode.ref) p.set("ref", mode.ref);
+  return p.toString();
+}
+
+export async function fetchWorkspace(mode: DiffMode): Promise<Workspace> {
+  const res = await fetch(`/api/workspace?${modeParams(mode)}`);
+  if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error || `workspace ${res.status}`);
+  return res.json();
+}
+
+export async function fetchFile(path: string, mode: DiffMode): Promise<FilePayload> {
+  const res = await fetch(`/api/file?path=${encodeURIComponent(path)}&${modeParams(mode)}`);
+  if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error || `file ${res.status}`);
   return res.json();
 }
 
@@ -25,12 +34,10 @@ export async function call<T = unknown>(name: string, args: unknown): Promise<T>
   return data.result as T;
 }
 
-// Subscribe to live change events. Returns an unsubscribe function. The browser
-// auto-reconnects EventSource on transient errors.
 export function subscribe(onChange: () => void, onStatus?: (ok: boolean) => void): () => void {
   const es = new EventSource("/events");
   es.onopen = () => onStatus?.(true);
-  es.onmessage = () => onChange(); // only `data:` lines fire this; heartbeats are comments
+  es.onmessage = () => onChange();
   es.onerror = () => onStatus?.(false);
   return () => es.close();
 }

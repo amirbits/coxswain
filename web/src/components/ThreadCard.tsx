@@ -25,11 +25,8 @@ export function ThreadCard({
   onFocus?: () => void;
 }) {
   const [replying, setReplying] = useState(false);
-  const loc = thread.anchor.locator;
-  const where =
-    loc.kind === "lines"
-      ? `${basename(loc.path)}:${loc.startLine}${loc.endLine !== loc.startLine ? `–${loc.endLine}` : ""}`
-      : "INTENT.md";
+  const line = thread.located?.startLine ?? thread.anchor.startLine;
+  const where = line > 0 ? `${basename(thread.anchor.path)}:${line}` : basename(thread.anchor.path);
 
   return (
     <div
@@ -38,14 +35,13 @@ export function ThreadCard({
       onMouseDown={onFocus}
     >
       <div className="thread-head">
-        <span className={`badge ${thread.anchor.view}`}>{thread.anchor.view}</span>
         <span className="thread-where">{where}</span>
         <span className="spacer" />
         <span className={`status ${thread.effectiveStatus}`}>{thread.effectiveStatus}</span>
       </div>
 
-      {thread.context && thread.anchor.view === "intent" && (
-        <blockquote className="thread-quote">{truncate(thread.context, 180)}</blockquote>
+      {thread.context && (
+        <blockquote className="thread-quote">{truncate(thread.context.replace(/\s+/g, " ").trim(), 160)}</blockquote>
       )}
 
       <div className="messages">
@@ -99,17 +95,7 @@ export function ThreadCard({
   );
 }
 
-// A suggested edit: the proposed base -> newText replacement, with Apply
-// (write-through to the file) / Dismiss when still pending.
-function SuggestionBlock({
-  s,
-  onApply,
-  onDismiss,
-}: {
-  s: Suggestion;
-  onApply: () => void;
-  onDismiss: () => void;
-}) {
+function SuggestionBlock({ s, onApply, onDismiss }: { s: Suggestion; onApply: () => void; onDismiss: () => void }) {
   return (
     <div className={`suggestion ${s.status}`}>
       <div className="suggestion-head">

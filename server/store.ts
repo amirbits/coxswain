@@ -1,6 +1,6 @@
-// File store for the two non-git truths: INTENT.md and the .reviews/ comment
-// threads. Comments live in-repo as plain JSON so the agent reads them with zero
-// extra API (DESIGN.md §3). The store never caches — it reads/writes files.
+// File store for INTENT.md and the .reviews/ comment threads. Comments live
+// in-repo as plain JSON. On read, threads are normalized to the v2 content-anchor
+// shape (DESIGN.md §12) via a compat shim, so older comments keep working.
 
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
@@ -13,11 +13,9 @@ export class Store {
   private reviewsDir(): string {
     return join(this.root, ".reviews");
   }
-
   private intentPath(): string {
     return join(this.root, "INTENT.md");
   }
-
   private fileFor(id: string): string {
     if (!/^[A-Za-z0-9_-]+$/.test(id)) throw new Error(`invalid thread id: ${id}`);
     return join(this.reviewsDir(), `${id}.json`);
@@ -31,7 +29,6 @@ export class Store {
     return { content: await readFile(path, "utf8"), exists: true, path: "INTENT.md" };
   }
 
-  // Write-through: editing the intent view edits the file (DESIGN.md §1).
   async writeIntent(content: string): Promise<void> {
     await writeFile(this.intentPath(), content, "utf8");
   }
@@ -41,15 +38,14 @@ export class Store {
   async listThreads(): Promise<Thread[]> {
     const dir = this.reviewsDir();
     if (!existsSync(dir)) return [];
-    const entries = await readdir(dir);
     const out: Thread[] = [];
-    for (const f of entries) {
+    for (const f of await readdir(dir)) {
       if (!f.endsWith(".json")) continue;
       try {
-        const t = JSON.parse(await readFile(join(dir, f), "utf8")) as Thread;
-        if (t && typeof t.id === "string" && Array.isArray(t.thread)) out.push(t);
+        const t = normalizeThread(JSON.parse(await readFile(join(dir, f), "utf8")));
+        if (t) out.push(t);
       } catch {
-        // skip malformed thread files rather than failing the whole list
+        // skip malformed
       }
     }
     out.sort((a, b) => (a.thread[0]?.ts ?? "").localeCompare(b.thread[0]?.ts ?? ""));
@@ -60,7 +56,7 @@ export class Store {
     const p = this.fileFor(id);
     if (!existsSync(p)) return null;
     try {
-      return JSON.parse(await readFile(p, "utf8")) as Thread;
+      return normalizeThread(JSON.parse(await readFile(p, "utf8")));
     } catch {
       return null;
     }
@@ -71,21 +67,16 @@ export class Store {
     await writeFile(this.fileFor(t.id), JSON.stringify(t, null, 2) + "\n", "utf8");
   }
 
-  async createThread(
-    anchor: Anchor,
-    body: string,
-    author: Author = "human",
-    context?: string,
-  ): Promise<Thread> {
-    const thread: Thread = {
+  async createThread(anchor: Anchor, body: string, author: Author = "human", context?: string): Promise<Thread> {
+    const t: Thread = {
       id: crypto.randomUUID(),
       anchor,
       status: "open",
       thread: [{ author, body, ts: new Date().toISOString() }],
       ...(context ? { context } : {}),
     };
-    await this.saveThread(thread);
-    return thread;
+    await this.saveThread(t);
+    return t;
   }
 
   async appendMessage(id: string, author: Author, body: string): Promise<Thread> {
@@ -106,25 +97,16 @@ export class Store {
 
   // Suggestions -------------------------------------------------------------
 
-  // The file a thread's suggestion would edit: INTENT.md for intent threads,
-  // else the anchored source file.
   private targetFile(t: Thread): string {
-    if (t.anchor.view === "intent") return this.intentPath();
-    const loc = t.anchor.locator;
-    if (loc.kind === "lines") return join(this.root, loc.path);
-    throw new Error("thread has no target file to edit");
+    return join(this.root, t.anchor.path);
   }
 
-  // The exact current text a suggestion replaces, derived from the anchor. For
-  // line anchors it is read straight from the file (drift-safe); for an intent
-  // quote it only works if the quote is still verbatim in the source.
   private async deriveBase(t: Thread): Promise<string | null> {
     const file = this.targetFile(t);
     if (!existsSync(file)) return null;
     const content = await readFile(file, "utf8");
-    const loc = t.anchor.locator;
-    if (loc.kind === "lines") {
-      return content.split("\n").slice(loc.startLine - 1, loc.endLine).join("\n");
+    if (t.anchor.startLine > 0) {
+      return content.split("\n").slice(t.anchor.startLine - 1, t.anchor.endLine).join("\n");
     }
     return t.context && content.includes(t.context) ? t.context : null;
   }
@@ -138,9 +120,7 @@ export class Store {
     let base = opts.base;
     if (base === undefined) {
       const derived = await this.deriveBase(t);
-      if (derived === null) {
-        throw new Error('could not locate the anchored text to replace; pass an explicit base');
-      }
+      if (derived === null) throw new Error("could not locate the anchored text to replace; pass an explicit base");
       base = derived;
     }
     t.thread.push({
@@ -161,16 +141,13 @@ export class Store {
     return undefined;
   }
 
-  // Write-through: apply the thread's pending suggestion to its file. Replaces
-  // the unique occurrence of `base` with `newText`; refuses if the text drifted
-  // (0 matches) or is ambiguous (>1). Never commits.
   async applySuggestion(id: string): Promise<{ thread: Thread; file: string }> {
     const t = await this.getThread(id);
     if (!t) throw new Error(`thread not found: ${id}`);
     const msg = this.latestProposed(t);
     if (!msg?.suggestion) throw new Error("no pending suggestion on this thread");
     const file = this.targetFile(t);
-    if (!existsSync(file)) throw new Error(`target file not found: ${file}`);
+    if (!existsSync(file)) throw new Error(`target file not found: ${t.anchor.path}`);
     const content = await readFile(file, "utf8");
     const { base, newText } = msg.suggestion;
     const n = occurrences(content, base);
@@ -191,6 +168,34 @@ export class Store {
     await this.saveThread(t);
     return t;
   }
+}
+
+// Compat shim: accept the v2 shape or the older per-view shape and return v2.
+function normalizeThread(raw: any): Thread | null {
+  if (!raw || typeof raw.id !== "string" || !Array.isArray(raw.thread)) return null;
+
+  let anchor: Anchor;
+  const a = raw.anchor ?? {};
+  if (typeof a.path === "string" && typeof a.startLine === "number") {
+    anchor = { path: a.path, startLine: a.startLine, endLine: a.endLine ?? a.startLine };
+  } else {
+    // legacy: { view, version, locator }
+    const loc = a.locator ?? {};
+    if (loc.kind === "lines") {
+      anchor = { path: loc.path, startLine: loc.startLine ?? 0, endLine: loc.endLine ?? loc.startLine ?? 0 };
+    } else {
+      // legacy intent text anchor → INTENT.md
+      anchor = { path: a.view === "intent" ? "INTENT.md" : (loc.path ?? "INTENT.md"), startLine: 0, endLine: 0 };
+    }
+  }
+
+  return {
+    id: raw.id,
+    anchor,
+    status: raw.status === "resolved" ? "resolved" : "open",
+    thread: raw.thread,
+    ...(raw.context ? { context: raw.context } : {}),
+  };
 }
 
 function occurrences(hay: string, needle: string): number {

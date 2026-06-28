@@ -51,6 +51,9 @@ the server running (run `helm help` for the full list):
 
 ```sh
 helm context            # orient: intent + changed files + open comments, in one shot
+helm tree               # file explorer: changed + commented files (--all = every file)
+helm file <path>        # print a file's current content
+helm diff [path]        # diff (whole repo or one file); --branch <ref> / --ref <tag>
 helm comments           # list open review threads (--all to include resolved)
 helm show <id>          # one thread in full (id = any unique prefix, like git)
 helm reply <id> "…"     # answer a thread, as the agent
@@ -112,8 +115,9 @@ browser re-projects state live.
   and the filesystem — no authoritative state of its own. `GET /api/state` composes
   the whole projection; `POST /api/call` dispatches the function registry; `/events`
   is the SSE change stream.
-- **Web** (`web/`, React + Vite + TS): the Intent and Diff views (both Reviewable)
-  plus the Review panel.
+- **Web** (`web/`, React + Vite + TS): a file explorer, the file view and per-file
+  diff view (both Reviewable, with working / branch / commit diff modes), plus the
+  Review panel.
 - **Single binary**: `bun run build` bakes the web app into the executable, so `helm`
   runs from any folder with nothing else on disk.
 
