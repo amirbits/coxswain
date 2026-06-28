@@ -803,6 +803,15 @@ code {
   flex: 1;
   min-width: 0;
   background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 
 .tree {
@@ -933,7 +942,13 @@ code {
 }
 
 .file-view {
-  padding-bottom: 48px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.file-view .file-subbar {
+  flex: none;
 }
 .code-view {
   font-family: var(--mono);
@@ -968,6 +983,9 @@ code {
 }
 .markdown-wrap {
   padding: 8px 18px 64px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 .md-note {
   font-size: 12px;
@@ -1094,7 +1112,7 @@ code {
 .cm-host {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
   min-height: 0;
 }
 .cm-editor-host {
@@ -1154,6 +1172,10 @@ code {
   border-right: 1px solid var(--line);
   background: var(--panel);
   color: var(--faint);
+}
+.cm-editor-host .cm-gutter.cm-lineNumbers .cm-gutterElement:hover {
+  background: var(--hover);
+  color: var(--ink);
 }
 .cm-sel {
   background: var(--accent-soft);

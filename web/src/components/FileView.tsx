@@ -219,7 +219,10 @@ function CodePane(props: Props & { canEdit: boolean }) {
           click: (event, view) => {
             const target = event.target as HTMLElement | null;
             if (!target || !target.closest(".cm-gutters")) return false;
-            const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+            // posAtCoords returns null over the gutter (it's not rendered
+            // content); reuse the click's y with an x inside the content area.
+            const rect = view.contentDOM.getBoundingClientRect();
+            const pos = view.posAtCoords({ x: rect.left + 2, y: event.clientY });
             if (pos == null) return false;
             const n = view.state.doc.lineAt(pos).number;
             setSel((prev) =>
@@ -322,40 +325,38 @@ function CodePane(props: Props & { canEdit: boolean }) {
   return (
     <div className="code-view cm-host">
       <div className="cm-editor-host" ref={hostRef} />
-      {(sel || (canEdit && (editable || dirty)) || sel) && (
-        <div className="cm-subfooter">
-          {sel && (
-            <div className="inline-composer">
-              <div className="composer-where">
-                {file.path.split("/").pop()}:{sel.start}
-                {sel.end !== sel.start ? `–${sel.end}` : ""}
-              </div>
-              <Composer placeholder="Comment on these lines…" onSubmit={submitComment} onCancel={clearSel} />
+      <div className="cm-subfooter">
+        {sel ? (
+          <div className="inline-composer">
+            <div className="composer-where">
+              {file.path.split("/").pop()}:{sel.start}
+              {sel.end !== sel.start ? `–${sel.end}` : ""}
             </div>
-          )}
-          {!sel && canEdit && !editable && (
-            <div className="edit-bar">
-              <span className="muted">read-only</span>
-              <span className="spacer" />
+            <Composer placeholder="Comment on these lines…" onSubmit={submitComment} onCancel={clearSel} />
+          </div>
+        ) : editable ? (
+          <div className="edit-bar">
+            <span className="muted">{dirty ? "unsaved changes" : "no changes"}</span>
+            <span className="spacer" />
+            <button className="btn ghost small" onClick={cancelEdit}>
+              Cancel
+            </button>
+            <button className="btn primary small" disabled={!dirty} onClick={doSave}>
+              Save{dirty ? " *" : ""}
+            </button>
+          </div>
+        ) : (
+          <div className="edit-bar">
+            <span className="muted">click a line number to comment{canEdit ? " · Edit to write" : ""}</span>
+            <span className="spacer" />
+            {canEdit && (
               <button className="btn small" onClick={startEdit} title="Edit this file (write-through, never commits)">
                 Edit
               </button>
-            </div>
-          )}
-          {!sel && editable && (
-            <div className="edit-bar">
-              <span className="muted">{dirty ? "unsaved changes" : "no changes"}</span>
-              <span className="spacer" />
-              <button className="btn ghost small" onClick={cancelEdit}>
-                Cancel
-              </button>
-              <button className="btn primary small" disabled={!dirty} onClick={doSave}>
-                Save{dirty ? " *" : ""}
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
