@@ -4,7 +4,7 @@
 // (DESIGN.md §2, §12).
 
 import { basename } from "node:path";
-import { changedFiles, currentBranch, diffFile, headSha, listFiles, listRefs, readFileContent } from "./git";
+import { changedFiles, currentBranch, diffFile, fileStatus, headSha, listFiles, listRefs, readFileContent } from "./git";
 import { decorateThreads } from "./review";
 import type { Store } from "./store";
 import type { DiffMode, FilePayload, TreeEntry, Workspace } from "./types";
@@ -45,17 +45,10 @@ export async function getWorkspace(root: string, store: Store, mode: DiffMode): 
 }
 
 export async function getFile(root: string, store: Store, path: string, mode: DiffMode): Promise<FilePayload> {
-  const [file, diff, changed] = await Promise.all([
+  const [file, diff, status] = await Promise.all([
     readFileContent(root, path),
     diffFile(root, path, mode),
-    changedFiles(root, mode),
+    fileStatus(root, path, mode),
   ]);
-  return {
-    path,
-    exists: file.exists,
-    kind: file.kind,
-    content: file.content,
-    diff,
-    status: changed[path] ?? null,
-  };
+  return { path, exists: file.exists, kind: file.kind, content: file.content, diff, status };
 }

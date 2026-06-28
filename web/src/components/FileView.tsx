@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type MouseEvent } from "react";
-import { createRoot } from "react-dom/client";
+import { useEffect, useRef, useState } from "react";
+import { createRoot, type Root } from "react-dom/client";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Compartment, EditorState, Range, StateEffect, StateField } from "@codemirror/state";
@@ -7,20 +7,13 @@ import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetTy
 import { defaultKeymap, historyKeymap } from "@codemirror/commands";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags } from "@lezer/highlight";
-import { css } from "@codemirror/lang-css";
-import { html } from "@codemirror/lang-html";
-import { javascript } from "@codemirror/lang-javascript";
-import { json } from "@codemirror/lang-json";
-import { markdown } from "@codemirror/lang-markdown";
-import { python } from "@codemirror/lang-python";
 import type { Extension } from "@codemirror/state";
 import type { DecoratedThread, FilePayload, NewComment } from "../types";
 import { truncate } from "../util";
 import { Composer } from "./Composer";
 import { ThreadCard, type ThreadActions } from "./ThreadCard";
 
-// Class-based highlight style so token colors adapt to dark mode via CSS
-// (HighlightStyle with `class` instead of inline colors).
+// Class-based highlight style so token colors adapt to dark mode via CSS.
 const helmHighlight = HighlightStyle.define([
   { tag: tags.keyword, class: "tok-kw" },
   { tag: [tags.name, tags.variableName, tags.propertyName], class: "tok-var" },
@@ -37,12 +30,28 @@ const helmHighlight = HighlightStyle.define([
   { tag: tags.attributeName, class: "tok-attr" },
 ]);
 
+// Grammars are loaded on demand per file type so they stay out of the initial
+// bundle (Vite code-splits each dynamic import).
+async function loadLanguage(path: string): Promise<Extension> {
+  try {
+    if (/\.md$/i.test(path)) return (await import("@codemirror/lang-markdown")).markdown();
+    if (/\.(ts|tsx)$/i.test(path)) return (await import("@codemirror/lang-javascript")).javascript({ typescript: true, jsx: true });
+    if (/\.(js|jsx|mjs|cjs)$/i.test(path)) return (await import("@codemirror/lang-javascript")).javascript({ jsx: true });
+    if (/\.css$/i.test(path)) return (await import("@codemirror/lang-css")).css();
+    if (/\.json$/i.test(path)) return (await import("@codemirror/lang-json")).json();
+    if (/\.py$/i.test(path)) return (await import("@codemirror/lang-python")).python();
+    if (/\.html?$/i.test(path)) return (await import("@codemirror/lang-html")).html();
+  } catch {
+    // grammar failed to load → no highlighting, still usable
+  }
+  return [];
+}
+
 // The file as-is (DESIGN.md §12). Markdown renders formatted with select-to-
 // comment (+ a raw/edit toggle); everything else is a CodeMirror code view that
 // is read-only by default (syntax highlighting) and editable on demand, with
 // write-through save. Click a gutter line (shift-click for a range) to comment;
-// existing threads overlay on their located line as CM widgets. Both anchor the
-// comment to the line content.
+// the composer and existing threads render inline at the line as CM widgets.
 type Props = {
   file: FilePayload;
   threads: DecoratedThread[];
@@ -54,26 +63,14 @@ type Props = {
   onEditingChange?: (editing: boolean) => void;
 };
 
-function languageForPath(path: string): Extension[] {
-  if (/\.md$/i.test(path)) return [markdown()];
-  if (/\.(ts|tsx)$/i.test(path)) return [javascript({ typescript: true, jsx: true })];
-  if (/\.(js|jsx|mjs|cjs)$/i.test(path)) return [javascript({ jsx: true })];
-  if (/\.css$/i.test(path)) return [css()];
-  if (/\.json$/i.test(path)) return [json()];
-  if (/\.py$/i.test(path)) return [python()];
-  if (/\.html?$/i.test(path)) return [html()];
-  return [];
-}
-
 export function FileView(props: Props) {
   const { file } = props;
+  const [raw, setRaw] = useState(false);
 
   if (!file.exists) return <div className="empty big"><p>File not found.</p></div>;
   if (file.kind === "binary") return <div className="empty big"><p>Binary file.</p></div>;
 
   const isMd = file.kind === "markdown";
-  const [raw, setRaw] = useState(false);
-
   return (
     <div className="file-view">
       {isMd && (
@@ -91,6 +88,8 @@ export function FileView(props: Props) {
 // --- CodeMirror pane --------------------------------------------------------
 
 type Ctx = { threads: DecoratedThread[]; actions: ThreadActions; activeThreadId: string | null; onFocusThread: (id: string) => void };
+type ComposerCtx = { sel: { start: number; end: number } | null; submit: (t: string) => void; cancel: () => void; label: string };
+
 const setSelEffect = StateEffect.define<{ start: number; end: number } | null>();
 const refreshEffect = StateEffect.define<null>();
 
@@ -116,15 +115,13 @@ const selField = StateField.define<DecorationSet>({
   provide: (f) => EditorView.decorations.from(f),
 });
 
-// A widget that mounts the inline thread cards for one line via a React portal.
+// Inline thread cards for one line, mounted via a React portal.
 class ThreadWidget extends WidgetType {
-  root?: ReturnType<typeof createRoot>;
+  root?: Root;
   constructor(readonly threads: DecoratedThread[], readonly ctx: Ctx) {
     super();
   }
   eq(other: ThreadWidget) {
-    // Reuse the portal unless the set of threads, their message counts, or the
-    // active highlight changed — avoids remounting (and losing focus) on noop.
     return (
       this.ctx.activeThreadId === other.ctx.activeThreadId &&
       this.threads.length === other.threads.length &&
@@ -151,12 +148,49 @@ class ThreadWidget extends WidgetType {
     );
     return host;
   }
+  ignoreEvent() {
+    return true;
+  }
   destroy() {
     this.root?.unmount();
   }
 }
 
-function threadPlugin(ctxRef: { current: Ctx }) {
+// The new-comment composer, inline at the selected line. eq() is stable while
+// the line is unchanged, so CM reuses the DOM (and the textarea keeps its text)
+// across rebuilds; callbacks are read fresh from the ref to avoid stale closures.
+class ComposerWidget extends WidgetType {
+  root?: Root;
+  constructor(readonly line: number, readonly ctxRef: { current: ComposerCtx }) {
+    super();
+  }
+  eq(other: ComposerWidget) {
+    return this.line === other.line;
+  }
+  toDOM() {
+    const host = document.createElement("div");
+    host.className = "cm-composer";
+    const ref = this.ctxRef;
+    this.root = createRoot(host);
+    this.root.render(
+      <div className="inline-composer">
+        <div className="composer-where">{ref.current.label}</div>
+        <Composer placeholder="Comment on these lines…" onSubmit={(t) => ref.current.submit(t)} onCancel={() => ref.current.cancel()} />
+      </div>,
+    );
+    return host;
+  }
+  ignoreEvent() {
+    return true;
+  }
+  destroy() {
+    this.root?.unmount();
+  }
+}
+
+// One plugin renders both the inline threads and the inline composer, and only
+// rebuilds on doc / threads / selection changes (not on every scroll or cursor).
+function decorationsPlugin(ctxRef: { current: Ctx }, composerRef: { current: ComposerCtx }) {
   return ViewPlugin.fromClass(
     class {
       decorations: DecorationSet;
@@ -164,20 +198,25 @@ function threadPlugin(ctxRef: { current: Ctx }) {
         this.decorations = this.build(view);
       }
       update(u: ViewUpdate) {
-        this.decorations = this.build(u.view);
+        const relevant = u.docChanged || u.transactions.some((tr) => tr.effects.some((e) => e.is(refreshEffect) || e.is(setSelEffect)));
+        this.decorations = relevant ? this.build(u.view) : this.decorations.map(u.changes);
       }
       build(view: EditorView): DecorationSet {
         const ctx = ctxRef.current;
+        const decos: Range<Decoration>[] = [];
         const byLine: Record<number, DecoratedThread[]> = {};
         for (const t of ctx.threads) {
           const l = t.located?.endLine ?? t.anchor.endLine;
           if (l > 0) (byLine[l] ??= []).push(t);
         }
-        const decos: Range<Decoration>[] = [];
         for (const [ln, ts] of Object.entries(byLine)) {
           const n = Number(ln);
           if (n < 1 || n > view.state.doc.lines) continue;
           decos.push(Decoration.widget({ widget: new ThreadWidget(ts, ctx), side: 1 }).range(view.state.doc.line(n).to));
+        }
+        const sel = composerRef.current.sel;
+        if (sel && sel.end >= 1 && sel.end <= view.state.doc.lines) {
+          decos.push(Decoration.widget({ widget: new ComposerWidget(sel.end, composerRef), side: 1 }).range(view.state.doc.line(sel.end).to));
         }
         return Decoration.set(decos, true);
       }
@@ -197,6 +236,7 @@ function CodePane(props: Props & { canEdit: boolean }) {
   const [editable, setEditable] = useState(false);
   const [dirty, setDirty] = useState(false);
   const editableComp = useRef(new Compartment()).current;
+  const languageComp = useRef(new Compartment()).current;
   const saveRef = useRef<() => void>(() => {});
   const dirtyChangeRef = useRef<() => void>(() => {});
   dirtyChangeRef.current = () => {
@@ -204,33 +244,35 @@ function CodePane(props: Props & { canEdit: boolean }) {
     onEditingChange?.(true);
   };
 
-  // Build the editor once per file (keyed by path in FileView).
+  const fileName = file.path.split("/").pop();
+  const composerLabel = sel ? `${fileName}:${sel.start}${sel.end !== sel.start ? `–${sel.end}` : ""}` : "";
+  const composerRef = useRef<ComposerCtx>({ sel: null, submit: () => {}, cancel: () => {}, label: "" });
+  composerRef.current = { sel, submit: submitComment, cancel: clearSel, label: composerLabel };
+
+  // Build the editor once per file (CodePane is keyed by path in FileView).
   useEffect(() => {
     if (!hostRef.current) return;
-    const ctx = ctxRef;
     const state = EditorState.create({
       doc: file.content,
       extensions: [
-        lineNumbers(),
-        syntaxHighlighting(helmHighlight),
-        selField,
-        threadPlugin(ctx),
-        EditorView.domEventHandlers({
-          click: (event, view) => {
-            const target = event.target as HTMLElement | null;
-            if (!target || !target.closest(".cm-gutters")) return false;
-            // posAtCoords returns null over the gutter (it's not rendered
-            // content); reuse the click's y with an x inside the content area.
-            const rect = view.contentDOM.getBoundingClientRect();
-            const pos = view.posAtCoords({ x: rect.left + 2, y: event.clientY });
-            if (pos == null) return false;
-            const n = view.state.doc.lineAt(pos).number;
-            setSel((prev) =>
-              event.shiftKey && prev ? { start: Math.min(prev.start, n), end: Math.max(prev.end, n) } : { start: n, end: n },
-            );
-            return true;
+        // The gutter's own click handler (reliable — unlike a content-level DOM
+        // handler, which misses clicks on the gutter). Gives the clicked line.
+        lineNumbers({
+          domEventHandlers: {
+            click: (view, block, event) => {
+              const n = view.state.doc.lineAt(block.from).number;
+              const shift = (event as MouseEvent).shiftKey;
+              setSel((prev) =>
+                shift && prev ? { start: Math.min(prev.start, n), end: Math.max(prev.end, n) } : { start: n, end: n },
+              );
+              return true;
+            },
           },
         }),
+        syntaxHighlighting(helmHighlight),
+        selField,
+        decorationsPlugin(ctxRef, composerRef),
+        languageComp.of([]),
         keymap.of([...defaultKeymap, ...historyKeymap]),
         keymap.of([{ key: "Mod-s", run: () => { saveRef.current(); return true; } }]),
         EditorView.updateListener.of((u) => {
@@ -239,27 +281,27 @@ function CodePane(props: Props & { canEdit: boolean }) {
         editableComp.of(EditorView.editable.of(editable)),
         EditorView.theme({ "&": { height: "100%" }, ".cm-scroller": { overflow: "auto" } }),
         EditorView.lineWrapping,
-        ...languageForPath(file.path),
       ],
     });
     const view = new EditorView({ state, parent: hostRef.current });
     viewRef.current = view;
+    loadLanguage(file.path).then((ext) => {
+      viewRef.current?.dispatch({ effects: languageComp.reconfigure(ext) });
+    });
     return () => {
       view.destroy();
       viewRef.current = null;
-      // Release the edit lock so SSE refetch resumes for the next file.
       onEditingChange?.(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // React to edit-mode toggles.
   useEffect(() => {
     viewRef.current?.dispatch({ effects: editableComp.reconfigure(EditorView.editable.of(editable)) });
   }, [editable, editableComp]);
 
-  // Sync external content changes when not dirty (the SSE refetch is paused
-  // while editing — this covers non-editing refreshes and mode switches).
+  // Sync external content changes when not dirty (the SSE refetch is paused while
+  // editing; this covers non-editing refreshes and mode switches).
   useEffect(() => {
     const view = viewRef.current;
     if (!view || dirty) return;
@@ -268,20 +310,16 @@ function CodePane(props: Props & { canEdit: boolean }) {
     }
   }, [file.content, dirty]);
 
-  // Push the gutter selection into CM for highlighting.
+  // Selection drives both the highlight (selField) and the inline composer widget.
   useEffect(() => {
     viewRef.current?.dispatch({ effects: setSelEffect.of(sel) });
   }, [sel]);
 
-  // Force the thread-widget plugin to rebuild when threads/active change.
+  // Rebuild thread widgets when threads / active change.
   useEffect(() => {
     viewRef.current?.dispatch({ effects: refreshEffect.of(null) });
   }, [threads, activeThreadId]);
 
-  // Track dirty + notify the host so SSE refetch won't clobber the buffer.
-  // (handled by the updateListener installed above)
-
-  // Keep the ⌘S keymap (installed once) pointed at the latest save closure.
   saveRef.current = () => doSave();
 
   function clearSel() {
@@ -291,8 +329,7 @@ function CodePane(props: Props & { canEdit: boolean }) {
 
   async function submitComment(text: string) {
     if (!sel) return;
-    const view = viewRef.current;
-    const doc = view?.state.doc.toString() ?? file.content;
+    const doc = viewRef.current?.state.doc.toString() ?? file.content;
     const lines = doc.split("\n");
     const content = lines.slice(sel.start - 1, sel.end).join("\n");
     await onAddComment({ path: file.path, startLine: sel.start, endLine: sel.end, content }, text);
@@ -316,7 +353,6 @@ function CodePane(props: Props & { canEdit: boolean }) {
     const view = viewRef.current;
     if (!view || !onSave) return;
     const content = view.state.doc.toString();
-    // Optimistic: clear dirty now; refetch will resync the doc.
     setDirty(false);
     onEditingChange?.(false);
     onSave(file.path, content);
@@ -326,15 +362,7 @@ function CodePane(props: Props & { canEdit: boolean }) {
     <div className="code-view cm-host">
       <div className="cm-editor-host" ref={hostRef} />
       <div className="cm-subfooter">
-        {sel ? (
-          <div className="inline-composer">
-            <div className="composer-where">
-              {file.path.split("/").pop()}:{sel.start}
-              {sel.end !== sel.start ? `–${sel.end}` : ""}
-            </div>
-            <Composer placeholder="Comment on these lines…" onSubmit={submitComment} onCancel={clearSel} />
-          </div>
-        ) : editable ? (
+        {editable ? (
           <div className="edit-bar">
             <span className="muted">{dirty ? "unsaved changes" : "no changes"}</span>
             <span className="spacer" />
@@ -347,9 +375,11 @@ function CodePane(props: Props & { canEdit: boolean }) {
           </div>
         ) : (
           <div className="edit-bar">
-            <span className="muted">click a line number to comment{canEdit ? " · Edit to write" : ""}</span>
+            <span className="muted">
+              {sel ? "commenting — the box is below the line · Esc to cancel" : `click a line number to comment${canEdit ? " · Edit to write" : ""}`}
+            </span>
             <span className="spacer" />
-            {canEdit && (
+            {canEdit && !sel && (
               <button className="btn small" onClick={startEdit} title="Edit this file (write-through, never commits)">
                 Edit
               </button>
@@ -423,5 +453,3 @@ function MarkdownBody({ file, threads, onAddComment }: Props) {
     </div>
   );
 }
-
-// avoid an unused-import/type error for DecorationSet / Transaction

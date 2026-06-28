@@ -1188,6 +1188,17 @@ code {
 .cm-threads .thread {
   margin: 4px 0;
 }
+.cm-composer {
+  padding: 6px 12px 8px 44px;
+  background: rgba(79, 70, 229, 0.045);
+  border-left: 2px solid var(--accent);
+}
+.cm-composer .inline-composer {
+  padding: 0;
+}
+[data-theme="dark"] .cm-composer {
+  background: rgba(124, 124, 255, 0.09);
+}
 .cm-subfooter {
   border-top: 1px solid var(--line);
   background: var(--panel);

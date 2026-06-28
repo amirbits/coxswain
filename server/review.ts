@@ -2,23 +2,35 @@
 // anchored to file content; we find that content in the current file to (a) place
 // the inline highlight and (b) decide "outdated" when it's gone (DESIGN.md §12).
 
-import { existsSync } from "node:fs";
+import { statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { DecoratedThread, Located, Thread } from "./types";
 
+// Read-through cache keyed by mtime. decorate runs on every /api/workspace, so
+// unchanged commented files aren't re-read on each live refetch.
+const fileCache = new Map<string, { mtimeMs: number; content: string }>();
+async function readCachedFile(full: string): Promise<string | null> {
+  let mtimeMs: number;
+  try {
+    mtimeMs = statSync(full).mtimeMs;
+  } catch {
+    fileCache.delete(full);
+    return null;
+  }
+  const hit = fileCache.get(full);
+  if (hit && hit.mtimeMs === mtimeMs) return hit.content;
+  const content = await readFile(full, "utf8");
+  fileCache.set(full, { mtimeMs, content });
+  return content;
+}
+
 export async function decorateThreads(threads: Thread[], root: string): Promise<DecoratedThread[]> {
-  const cache = new Map<string, string | null>();
+  const seen = new Map<string, string | null>();
   const read = async (path: string): Promise<string | null> => {
-    if (cache.has(path)) return cache.get(path)!;
-    let content: string | null = null;
-    try {
-      const full = join(root, path);
-      if (existsSync(full)) content = await readFile(full, "utf8");
-    } catch {
-      // unreadable → treated as absent
-    }
-    cache.set(path, content);
+    if (seen.has(path)) return seen.get(path)!;
+    const content = await readCachedFile(join(root, path));
+    seen.set(path, content);
     return content;
   };
 

@@ -123,6 +123,20 @@ export async function changedFiles(root: string, mode: DiffMode): Promise<Record
   return map;
 }
 
+// Single-file change status for a mode — scoped to one path, so opening a file
+// doesn't run a whole-repo name-status (which getFile previously did per open).
+export async function fileStatus(root: string, path: string, mode: DiffMode): Promise<ChangeStatus> {
+  const head = await headSha(root);
+  const r = await git(root, ["diff", "--name-status", ...rangeArgs(mode, head), "--", path]);
+  const line = r.stdout.split("\n").find(Boolean);
+  if (line) return (line.split("\t")[0]?.[0] as ChangeStatus) ?? null;
+  if (mode.kind === "working") {
+    const u = await git(root, ["ls-files", "--others", "--exclude-standard", "--", path]);
+    if (u.stdout.trim()) return "A";
+  }
+  return null;
+}
+
 // Whole-repo diff for a mode (used by the CLI and the "all changes" view).
 export async function diffAll(root: string, mode: DiffMode): Promise<DiffPayload> {
   const head = await headSha(root);
