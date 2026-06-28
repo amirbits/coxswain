@@ -1,4 +1,6 @@
 import { useState } from "react";
+import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type { DecoratedThread, Suggestion } from "../types";
 import { basename, timeAgo, truncate } from "../util";
 import { Composer } from "./Composer";
@@ -51,7 +53,9 @@ export function ThreadCard({
               <span className={`who ${m.author}`}>{m.author}</span>
               <span className="when">{timeAgo(m.ts)}</span>
             </div>
-            <div className="msg-body">{m.body}</div>
+            <div className="msg-body md">
+              <Markdown remarkPlugins={[remarkGfm]}>{m.body}</Markdown>
+            </div>
             {m.suggestion && (
               <SuggestionBlock
                 s={m.suggestion}

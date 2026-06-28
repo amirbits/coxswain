@@ -209,6 +209,12 @@ code {
   background: #fbfaf7;
   border-bottom: 1px solid var(--line);
   padding: 7px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.loop-hint span {
+  flex: 1;
 }
 .loop-hint em {
   color: var(--ink);
@@ -961,4 +967,230 @@ code {
 }
 .diff-body {
   padding: 6px 0 48px;
+}
+
+/* === New UI: mode hint, palette, toasts, editor, dark mode =============== */
+
+.mode-hint {
+  font-size: 11px;
+  color: var(--outdated);
+  white-space: nowrap;
+}
+
+/* Command palette -------------------------------------------------------- */
+.palette-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(15, 15, 20, 0.25);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+}
+.palette {
+  width: min(560px, 92vw);
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+.palette-input {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  padding: 13px 16px;
+  font: inherit;
+  font-size: 15px;
+  background: transparent;
+  color: var(--ink);
+  outline: none;
+}
+.palette-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.palette-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+.palette-item.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.palette-item .palette-hint {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--faint);
+  font-family: var(--mono);
+}
+.palette-empty {
+  padding: 14px 16px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Toasts ----------------------------------------------------------------- */
+.toasts {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+.toast {
+  pointer-events: auto;
+  padding: 9px 14px;
+  border-radius: 9px;
+  font-size: 13px;
+  color: #fff;
+  background: #1c1c1e;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  max-width: 360px;
+  animation: toast-in 0.16s ease-out;
+}
+.toast.ok {
+  background: var(--resolved);
+}
+.toast.err {
+  background: #b91c1c;
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Editor (CodeMirror) ---------------------------------------------------- */
+.file-view .file-subbar {
+  display: flex;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+.cm-host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.cm-editor-host {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.cm-editor-host .cm-editor {
+  height: 100%;
+  background: var(--panel);
+}
+.cm-editor-host .cm-editor .cm-scroller {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.cm-editor-host .cm-gutters {
+  cursor: pointer;
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--faint);
+}
+.cm-sel {
+  background: var(--accent-soft);
+}
+.cm-threads {
+  padding: 4px 12px 4px 46px;
+  background: rgba(0, 0, 0, 0.015);
+  border-left: 2px solid var(--line-strong);
+}
+.cm-threads .thread {
+  margin: 4px 0;
+}
+.cm-subfooter {
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+  flex: none;
+}
+.edit-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+/* Markdown message bodies in thread cards -------------------------------- */
+.msg-body.md :where(p, ul, ol, pre, code) {
+  margin: 0.35em 0;
+}
+.msg-body.md :where(ul, ol) {
+  padding-left: 1.3em;
+}
+.msg-body.md pre {
+  background: #f1f0ec;
+  padding: 8px 10px;
+  border-radius: 6px;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.msg-body.md code {
+  font-family: var(--mono);
+  font-size: 0.9em;
+  background: #f1f0ec;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+.msg-body.md pre code {
+  background: transparent;
+  padding: 0;
+}
+
+/* Dark mode (token mirrors) --------------------------------------------- */
+[data-theme="dark"] {
+  --bg: #15151a;
+  --panel: #1c1c22;
+  --ink: #e7e7ea;
+  --muted: #9b9ba6;
+  --faint: #6b6b78;
+  --line: #2a2a32;
+  --line-strong: #3a3a44;
+  --accent: #8b8bf7;
+  --accent-soft: #2a2a44;
+  --open: #8b8bf7;
+  --open-soft: #2a2a44;
+  --outdated: #e0a85a;
+  --outdated-soft: #3a2e1c;
+  --resolved: #5db98a;
+  --resolved-soft: #1f3a2c;
+}
+[data-theme="dark"] body {
+  background: var(--bg);
+}
+[data-theme="dark"] .loop-hint,
+[data-theme="dark"] .error-bar {
+  background: #232329;
+}
+[data-theme="dark"] code,
+[data-theme="dark"] .msg-body.md pre,
+[data-theme="dark"] .msg-body.md code {
+  background: #2a2a32;
+}
+[data-theme="dark"] .cm-threads {
+  background: rgba(255, 255, 255, 0.02);
+}
+[data-theme="dark"] .toast.ok {
+  background: var(--resolved);
 }

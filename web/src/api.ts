@@ -4,11 +4,26 @@
 
 import type { DiffMode, FilePayload, Workspace } from "./types";
 
+export type BootPayload = { mode: DiffMode; root: string };
+export type RegistrySpec = { name: string; description: string };
+
 function modeParams(mode: DiffMode): string {
   const p = new URLSearchParams();
   p.set("mode", mode.kind);
   if (mode.ref) p.set("ref", mode.ref);
   return p.toString();
+}
+
+export async function fetchBoot(): Promise<BootPayload> {
+  const res = await fetch("/api/boot");
+  if (!res.ok) throw new Error(`boot ${res.status}`);
+  return res.json();
+}
+
+export async function fetchRegistry(): Promise<RegistrySpec[]> {
+  const res = await fetch("/api/registry");
+  if (!res.ok) return [];
+  return res.json();
 }
 
 export async function fetchWorkspace(mode: DiffMode): Promise<Workspace> {
@@ -32,6 +47,13 @@ export async function call<T = unknown>(name: string, args: unknown): Promise<T>
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.ok) throw new Error(data.error || `call ${name} failed`);
   return data.result as T;
+}
+
+// Write-through for the editor. INTENT.md goes through writeIntent; everything
+// else through writeFile. Never commits — acceptance is the human's commit.
+export async function editFile(path: string, content: string): Promise<void> {
+  const fn = path === "INTENT.md" ? "writeIntent" : "writeFile";
+  await call(fn, fn === "writeIntent" ? { content } : { path, content });
 }
 
 export function subscribe(onChange: () => void, onStatus?: (ok: boolean) => void): () => void {

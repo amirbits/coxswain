@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { call, fetchFile, fetchWorkspace, subscribe } from "./api";
+import { call, editFile, fetchBoot, fetchFile, fetchWorkspace, subscribe } from "./api";
 import { DiffView } from "./components/DiffView";
 import { Explorer } from "./components/Explorer";
 import { FileView } from "./components/FileView";
+import { Palette } from "./components/Palette";
 import { ReviewPanel } from "./components/ReviewPanel";
+import { Toasts, useToasts } from "./components/Toasts";
 import type { ThreadActions } from "./components/ThreadCard";
 import type { DiffMode, FilePayload, NewComment, Workspace } from "./types";
 
@@ -11,6 +13,7 @@ export default function App() {
   const [ws, setWs] = useState<Workspace | null>(null);
   const [file, setFile] = useState<FilePayload | null>(null);
   const [mode, setMode] = useState<DiffMode>({ kind: "working" });
+  const [pendingKind, setPendingKind] = useState<DiffMode["kind"]>("working");
   const [refInput, setRefInput] = useState("");
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [pane, setPane] = useState<"file" | "diff">("file");
@@ -20,6 +23,23 @@ export default function App() {
   const [showResolved, setShowResolved] = useState(false);
   const [showExplorer, setShowExplorer] = useState(true);
   const [showReview, setShowReview] = useState(true);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [dark, setDark] = useState(() => {
+    try {
+      const v = localStorage.getItem("helm:theme");
+      if (v) return v === "dark";
+    } catch {}
+    return false;
+  });
+  const [hintDismissed, setHintDismissed] = useState(() => {
+    try {
+      return localStorage.getItem("helm:hint-dismissed") === "1";
+    } catch {
+      return false;
+    }
+  });
+
+  const toasts = useToasts();
 
   const modeRef = useRef(mode);
   modeRef.current = mode;
@@ -28,6 +48,9 @@ export default function App() {
   const wsRef = useRef(ws);
   wsRef.current = ws;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // True while the editor has unsaved changes — SSE-driven refetch must not
+  // clobber the buffer (DESIGN.md §12; C1). Set by FileView via onEditingChange.
+  const editingRef = useRef(false);
 
   const loadFile = useCallback(async (path: string) => {
     const f = await fetchFile(path, modeRef.current);
@@ -36,8 +59,10 @@ export default function App() {
   }, []);
 
   // Re-project the workspace (and the open file) from the server. Debounced so a
-  // burst of SSE change events coalesces.
-  const refetch = useCallback(() => {
+  // burst of SSE change events coalesces. `pickPane` is set only on a
+  // mode change / explicit selection — never in the SSE path, or an external
+  // change would yank the pane out from under you while you're reading.
+  const refetch = useCallback((opts?: { pickPane?: boolean }) => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(async () => {
       try {
@@ -49,16 +74,41 @@ export default function App() {
           p = w.tree.find((e) => e.path === "INTENT.md")?.path ?? w.tree.find((e) => e.status)?.path ?? w.tree[0]?.path ?? null;
           setSelectedPath(p);
         }
-        if (p) await loadFile(p);
-        else setFile(null);
+        if (p) {
+          // Don't clobber a buffer being edited — workspace/threads still refresh.
+          if (editingRef.current && p === pathRef.current) return;
+          const f = await loadFile(p);
+          if (opts?.pickPane) setPane(f.diff ? "diff" : "file");
+        } else setFile(null);
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
       }
     }, 60);
   }, [loadFile]);
 
-  useEffect(() => refetch(), [mode, refetch]);
-  useEffect(() => subscribe(refetch, setConnected), [refetch]);
+  // Boot: apply the --base flag's chosen mode (if any) before the first render.
+  useEffect(() => {
+    fetchBoot()
+      .then((b) => {
+        setMode(b.mode);
+        setPendingKind(b.mode.kind);
+        if (b.mode.ref) setRefInput(b.mode.ref);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => refetch({ pickPane: true }), [mode, refetch]);
+  useEffect(() => subscribe(() => refetch(), setConnected), [refetch]);
+
+  // Persist + apply the dark theme on the document root.
+  useEffect(() => {
+    const el = document.documentElement;
+    if (dark) el.setAttribute("data-theme", "dark");
+    else el.removeAttribute("data-theme");
+    try {
+      localStorage.setItem("helm:theme", dark ? "dark" : "light");
+    } catch {}
+  }, [dark]);
 
   const selectFile = useCallback(
     async (path: string) => {
@@ -75,28 +125,49 @@ export default function App() {
   );
 
   const act = useCallback(
-    async (name: string, args: unknown) => {
+    async (name: string, args: unknown, okMsg?: string) => {
       try {
         await call(name, args);
         setError(null);
+        if (okMsg) toasts.ok(okMsg);
         refetch();
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        const msg = e instanceof Error ? e.message : String(e);
+        setError(msg);
+        toasts.err(msg);
       }
     },
-    [refetch],
+    [refetch, toasts],
   );
 
   const actions: ThreadActions = {
-    reply: (id, text) => act("replyComment", { id, text }),
-    resolve: (id) => act("resolveComment", { id }),
-    reopen: (id) => act("reopenComment", { id }),
-    apply: (id) => act("applySuggestion", { id }),
-    dismiss: (id) => act("dismissSuggestion", { id }),
+    reply: (id, text) => act("replyComment", { id, text }, "Replied"),
+    resolve: (id) => act("resolveComment", { id }, "Resolved"),
+    reopen: (id) => act("reopenComment", { id }, "Reopened"),
+    apply: (id) => act("applySuggestion", { id }, "Suggestion applied"),
+    dismiss: (id) => act("dismissSuggestion", { id }, "Suggestion dismissed"),
   };
 
   const addComment = (c: NewComment, text: string) =>
-    act("addComment", { path: c.path, startLine: c.startLine, endLine: c.endLine, text, context: c.content });
+    act("addComment", { path: c.path, startLine: c.startLine, endLine: c.endLine, text, context: c.content }, "Comment added");
+
+  // Write-through save for the editor (C1). Never commits.
+  const saveFile = useCallback(
+    async (path: string, content: string) => {
+      try {
+        await editFile(path, content);
+        editingRef.current = false;
+        setError(null);
+        toasts.ok("Saved");
+        await refetch({ pickPane: true });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setError(msg);
+        toasts.err(msg);
+      }
+    },
+    [refetch, toasts],
+  );
 
   const focusThread = useCallback(
     (id: string) => {
@@ -108,9 +179,62 @@ export default function App() {
     [selectFile],
   );
 
-  function setKind(kind: DiffMode["kind"]) {
-    setMode(kind === "working" ? { kind: "working" } : { kind, ref: refInput.trim() || null });
+  // Diff mode selection (A2): the select reflects the user's choice
+  // (pendingKind); a non-working mode only takes effect once a ref is entered,
+  // so we never silently render the working-tree diff as a "branch" diff.
+  function chooseKind(kind: DiffMode["kind"]) {
+    setPendingKind(kind);
+    if (kind === "working") {
+      setRefInput("");
+      setMode({ kind: "working" });
+    } else {
+      const ref = refInput.trim();
+      setMode(ref ? { kind, ref } : { kind: "working" });
+    }
   }
+  function commitRef() {
+    const ref = refInput.trim();
+    if (pendingKind === "working" || !ref) return;
+    setMode({ kind: pendingKind, ref });
+  }
+  const refMissing = pendingKind !== "working" && mode.kind === "working";
+
+  // Keyboard shortcuts (C5). ⌘K works everywhere; single-key shortcuts (j/k/1/2)
+  // are suppressed while the focus is in an input, textarea, contentEditable, or
+  // the CodeMirror editor so typing never triggers navigation.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((o) => !o);
+        return;
+      }
+      const t = e.target as HTMLElement | null;
+      const typing =
+        !!t &&
+        (t.tagName === "INPUT" ||
+          t.tagName === "TEXTAREA" ||
+          t.isContentEditable ||
+          t.closest(".cm-editor") != null);
+      if (typing) return;
+      const tree = wsRef.current?.tree ?? [];
+      if (e.key === "j" || e.key === "k") {
+        if (!tree.length) return;
+        const paths = tree.map((x) => x.path);
+        const idx = pathRef.current ? paths.indexOf(pathRef.current) : -1;
+        const dir = e.key === "j" ? 1 : -1;
+        const next = paths[Math.max(0, Math.min(paths.length - 1, (idx < 0 ? 0 : idx) + dir))];
+        if (next) selectFile(next);
+        e.preventDefault();
+      } else if (e.key === "1") {
+        setPane("file");
+      } else if (e.key === "2") {
+        setPane("diff");
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectFile]);
 
   if (!ws) {
     return <div className="boot">{error ? <div className="error">Helm error: {error}</div> : "Loading…"}</div>;
@@ -121,6 +245,36 @@ export default function App() {
       ? ws.threads.filter((t) => t.anchor.path === selectedPath && (showResolved || t.effectiveStatus !== "resolved"))
       : [];
   const refs = [...ws.repo.refs.branches, ...ws.repo.refs.tags];
+
+  const paletteActions = [
+    { id: "open-intent", label: "Open INTENT.md", run: () => selectFile("INTENT.md") },
+    { id: "toggle-explorer", label: "Toggle Files pane", run: () => setShowExplorer((s) => !s) },
+    { id: "toggle-review", label: "Toggle Review pane", run: () => setShowReview((s) => !s) },
+    { id: "toggle-dark", label: dark ? "Light mode" : "Dark mode", run: () => setDark((d) => !d) },
+    { id: "pane-file", label: "View: File", hint: "1", run: () => setPane("file") },
+    { id: "pane-diff", label: "View: Diff", hint: "2", run: () => setPane("diff") },
+    { id: "mode-working", label: "Diff mode: working tree", run: () => chooseKind("working") },
+    { id: "mode-branch", label: "Diff mode: vs branch…", run: () => chooseKind("branch") },
+    { id: "mode-ref", label: "Diff mode: vs commit/tag…", run: () => chooseKind("ref") },
+    { id: "toggle-resolved", label: showResolved ? "Hide resolved" : "Show resolved", run: () => setShowResolved((s) => !s) },
+    {
+      id: "resolve-all",
+      label: "Resolve all open threads",
+      run: () => {
+        const open = (wsRef.current?.threads ?? []).filter((t) => t.effectiveStatus === "open");
+        if (!open.length) {
+          toasts.ok("No open threads");
+          return;
+        }
+        Promise.all(open.map((t) => call("resolveComment", { id: t.id })))
+          .then(() => {
+            toasts.ok(`Resolved ${open.length}`);
+            refetch();
+          })
+          .catch((e: unknown) => toasts.err(e instanceof Error ? e.message : String(e)));
+      },
+    },
+  ];
 
   return (
     <div className="app">
@@ -133,12 +287,12 @@ export default function App() {
         </div>
 
         <div className="mode-bar">
-          <select value={mode.kind} onChange={(e) => setKind(e.target.value as DiffMode["kind"])}>
+          <select value={pendingKind} onChange={(e) => chooseKind(e.target.value as DiffMode["kind"])}>
             <option value="working">working tree</option>
             <option value="branch">vs branch</option>
             <option value="ref">vs commit/tag</option>
           </select>
-          {mode.kind !== "working" && (
+          {pendingKind !== "working" && (
             <>
               <input
                 list="helm-refs"
@@ -146,20 +300,24 @@ export default function App() {
                 placeholder="ref…"
                 onChange={(e) => setRefInput(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") setMode({ kind: mode.kind, ref: refInput.trim() || null });
+                  if (e.key === "Enter") commitRef();
                 }}
-                onBlur={() => setMode({ kind: mode.kind, ref: refInput.trim() || null })}
+                onBlur={commitRef}
               />
               <datalist id="helm-refs">
                 {refs.map((r) => (
                   <option key={r} value={r} />
                 ))}
               </datalist>
+              {refMissing && <span className="mode-hint">enter a ref</span>}
             </>
           )}
         </div>
 
         <span className="spacer" />
+        <button className="btn small" onClick={() => setPaletteOpen(true)} title="Command palette (⌘K)">
+          ⌘K
+        </button>
         <div className="toggles">
           <button className={`btn small${showExplorer ? " on" : ""}`} onClick={() => setShowExplorer((s) => !s)}>
             Files
@@ -167,16 +325,34 @@ export default function App() {
           <button className={`btn small${showReview ? " on" : ""}`} onClick={() => setShowReview((s) => !s)}>
             Review
           </button>
+          <button className={`btn small${dark ? " on" : ""}`} onClick={() => setDark((d) => !d)} title="Dark mode">
+            {dark ? "☾" : "☀"}
+          </button>
         </div>
         <div className={`conn ${connected ? "ok" : "down"}`}>{connected ? "live" : "offline"}</div>
       </header>
 
       {error && <div className="error-bar">{error}</div>}
 
-      <div className="loop-hint">
-        Comment on a file or its diff → tell your agent <em>“address the open review comments”</em> → it edits files
-        and the views update live. <strong>You</strong> commit to accept.
-      </div>
+      {!hintDismissed && (
+        <div className="loop-hint">
+          <span>
+            Comment on a file or its diff → tell your agent <em>“address the open review comments”</em> → it edits
+            files and the views update live. <strong>You</strong> commit to accept.
+          </span>
+          <button
+            className="btn small ghost"
+            onClick={() => {
+              setHintDismissed(true);
+              try {
+                localStorage.setItem("helm:hint-dismissed", "1");
+              } catch {}
+            }}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       <main className="workbench">
         {showExplorer && (
@@ -214,6 +390,10 @@ export default function App() {
                   activeThreadId={activeThreadId}
                   onFocusThread={focusThread}
                   onAddComment={addComment}
+                  onSave={saveFile}
+                  onEditingChange={(editing) => {
+                    editingRef.current = editing;
+                  }}
                 />
               ) : (
                 <DiffView
@@ -247,6 +427,11 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {paletteOpen && (
+        <Palette actions={paletteActions} onClose={() => setPaletteOpen(false)} />
+      )}
+      <Toasts toasts={toasts.items} />
     </div>
   );
 }
