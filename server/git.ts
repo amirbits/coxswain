@@ -69,6 +69,11 @@ export async function status(root: string): Promise<RepoStatus> {
   return { branch, head, ahead, behind, files, isRepo: true };
 }
 
+// Comment threads live under .reviews/ as their own truth (surfaced in the
+// Review panel), so keep them out of the code/content diff — otherwise leaving
+// a comment spawns a .reviews/*.json that clutters the very diff you're reviewing.
+const EXCLUDE_REVIEWS = ["--", ".", ":(exclude).reviews"];
+
 // The diff view's source of truth. `base` null === the live uncommitted diff
 // (staged + unstaged + new files). A base ref produces the PR-style
 // `base...HEAD` diff.
@@ -79,17 +84,17 @@ export async function getDiff(root: string, base: string | null): Promise<DiffPa
     if (!(await refExists(root, base))) {
       throw new Error(`base ref not found: ${base}`);
     }
-    const r = await git(root, ["diff", "--no-color", "--no-ext-diff", `${base}...HEAD`]);
+    const r = await git(root, ["diff", "--no-color", "--no-ext-diff", `${base}...HEAD`, ...EXCLUDE_REVIEWS]);
     return { raw: r.stdout, base, mode: "branch", head };
   }
 
   let raw = "";
   if (head) {
-    const r = await git(root, ["diff", "--no-color", "--no-ext-diff", "HEAD"]);
+    const r = await git(root, ["diff", "--no-color", "--no-ext-diff", "HEAD", ...EXCLUDE_REVIEWS]);
     raw = r.stdout;
   } else {
     // Unborn branch: nothing is committed, so "uncommitted" === staged.
-    const r = await git(root, ["diff", "--no-color", "--no-ext-diff", "--cached"]);
+    const r = await git(root, ["diff", "--no-color", "--no-ext-diff", "--cached", ...EXCLUDE_REVIEWS]);
     raw = r.stdout;
   }
   raw += await untrackedDiff(root);
@@ -102,7 +107,10 @@ async function untrackedDiff(root: string): Promise<string> {
   try {
     const r = await git(root, ["ls-files", "--others", "--exclude-standard", "-z"]);
     if (!r.ok) return "";
-    const files = r.stdout.split("\0").filter(Boolean).slice(0, 100);
+    const files = r.stdout
+      .split("\0")
+      .filter((f) => f && !f.startsWith(".reviews/"))
+      .slice(0, 100);
     let out = "";
     for (const f of files) {
       try {

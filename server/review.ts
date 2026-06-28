@@ -21,7 +21,11 @@ function decorate(t: Thread, ctx: DriftContext): DecoratedThread {
   // Only open threads can be outdated; resolved ones are done.
   if (t.status === "open" && t.context) {
     if (t.anchor.view === "intent") {
-      outdated = !ctx.intent.content.includes(t.context);
+      // Markdown is rendered but anchored against the raw source, so a text
+      // selection comes back without its formatting markers (*italic*, **bold**,
+      // `code`, links). Normalize both sides before comparing — otherwise a
+      // comment on any formatted prose would read as outdated immediately.
+      outdated = !normalizeProse(ctx.intent.content).includes(normalizeProse(t.context));
     } else if (t.anchor.view === "diff") {
       outdated = !ctx.diff.raw.includes(t.context);
     }
@@ -31,4 +35,15 @@ function decorate(t: Thread, ctx: DriftContext): DecoratedThread {
     t.status === "resolved" ? "resolved" : outdated ? "outdated" : "open";
 
   return { ...t, outdated, effectiveStatus };
+}
+
+// Strip inline markdown markers and collapse whitespace so a rendered selection
+// matches the raw source. Lossy on purpose: a real rewrite still drifts the
+// quote out, but mere formatting no longer triggers a false "outdated".
+function normalizeProse(s: string): string {
+  return s
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1") // [text](url) -> text
+    .replace(/[*_`~]+/g, "") // emphasis / code / strikethrough markers
+    .replace(/\s+/g, " ") // newlines + runs of spaces -> single space
+    .trim();
 }

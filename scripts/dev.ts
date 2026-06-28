@@ -8,7 +8,7 @@ const root = join(import.meta.dir, "..");
 const serverPort = "4317";
 
 const server = Bun.spawn(
-  ["bun", join(root, "server/index.ts"), "--dev", "--no-open", "--port", serverPort, "--dir", root],
+  ["bun", "--watch", join(root, "server/index.ts"), "--dev", "--no-open", "--port", serverPort, "--dir", root],
   { cwd: root, stdout: "inherit", stderr: "inherit", stdin: "inherit" },
 );
 
