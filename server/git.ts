@@ -139,10 +139,15 @@ export async function diffFile(root: string, path: string, mode: DiffMode): Prom
   if (mode.ref && !(await refExists(root, mode.ref))) throw new Error(`ref not found: ${mode.ref}`);
   const r = await git(root, ["diff", "--no-color", "--no-ext-diff", ...rangeArgs(mode, head), "--", path]);
   if (r.stdout) return r.stdout;
-  // untracked new file in working mode: synthesize an added-file diff
+  // An *untracked* new file has no HEAD diff — synthesize an added-file diff for
+  // it. A tracked file with no changes correctly returns "" (don't synth those,
+  // or every committed file would render as all-added).
   if (mode.kind === "working" && existsSync(join(root, path))) {
-    const u = await git(root, ["diff", "--no-color", "--no-ext-diff", "--no-index", "/dev/null", path]);
-    if (u.code <= 1) return u.stdout;
+    const tracked = await git(root, ["ls-files", "--error-unmatch", "--", path]);
+    if (!tracked.ok) {
+      const u = await git(root, ["diff", "--no-color", "--no-ext-diff", "--no-index", "/dev/null", path]);
+      if (u.code <= 1) return u.stdout;
+    }
   }
   return "";
 }
