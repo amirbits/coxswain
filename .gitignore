@@ -1,0 +1,15 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+web/dist/
+/helm
+server/assets.generated.ts
+
+# misc
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
