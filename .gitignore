@@ -13,3 +13,6 @@ server/assets.generated.ts
 .env
 .env.*
 !.env.example
+
+# local, machine-specific Claude Code settings
+.claude/settings.local.json
