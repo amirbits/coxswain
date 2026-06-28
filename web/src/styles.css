@@ -1101,6 +1101,33 @@ code {
   font-size: 12.5px;
   line-height: 1.55;
 }
+/* syntax highlighting tokens (class-based; theme-aware) */
+.cm-editor .tok-kw { color: #7c3aed; }
+.cm-editor .tok-str { color: #0b7a3b; }
+.cm-editor .tok-num { color: #b45309; }
+.cm-editor .tok-bool { color: #b45309; }
+.cm-editor .tok-comment { color: #8a8a93; font-style: italic; }
+.cm-editor .tok-fn { color: #1d4ed8; }
+.cm-editor .tok-type { color: #0e7490; }
+.cm-editor .tok-def { color: #1d4ed8; }
+.cm-editor .tok-op { color: #6b6b78; }
+.cm-editor .tok-punc { color: #6b6b78; }
+.cm-editor .tok-tag { color: #b91c1c; }
+.cm-editor .tok-attr { color: #7c3aed; }
+.cm-editor .tok-var { color: var(--ink); }
+[data-theme="dark"] .cm-editor .tok-kw { color: #b794f6; }
+[data-theme="dark"] .cm-editor .tok-str { color: #7dd3a0; }
+[data-theme="dark"] .cm-editor .tok-num { color: #f0a85a; }
+[data-theme="dark"] .cm-editor .tok-bool { color: #f0a85a; }
+[data-theme="dark"] .cm-editor .tok-comment { color: #7b7b88; }
+[data-theme="dark"] .cm-editor .tok-fn { color: #93c5fd; }
+[data-theme="dark"] .cm-editor .tok-type { color: #67e8f9; }
+[data-theme="dark"] .cm-editor .tok-def { color: #93c5fd; }
+[data-theme="dark"] .cm-editor .tok-op { color: #9b9ba6; }
+[data-theme="dark"] .cm-editor .tok-punc { color: #9b9ba6; }
+[data-theme="dark"] .cm-editor .tok-tag { color: #fca5a5; }
+[data-theme="dark"] .cm-editor .tok-attr { color: #c4b5fd; }
+[data-theme="dark"] .cm-editor .tok-var { color: var(--ink); }
 .cm-editor-host .cm-gutters {
   cursor: pointer;
   border-right: 1px solid var(--line);

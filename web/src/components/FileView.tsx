@@ -5,6 +5,8 @@ import remarkGfm from "remark-gfm";
 import { Compartment, EditorState, Range, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetType, keymap, lineNumbers } from "@codemirror/view";
 import { defaultKeymap, historyKeymap } from "@codemirror/commands";
+import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import { tags } from "@lezer/highlight";
 import { css } from "@codemirror/lang-css";
 import { html } from "@codemirror/lang-html";
 import { javascript } from "@codemirror/lang-javascript";
@@ -16,6 +18,24 @@ import type { DecoratedThread, FilePayload, NewComment } from "../types";
 import { truncate } from "../util";
 import { Composer } from "./Composer";
 import { ThreadCard, type ThreadActions } from "./ThreadCard";
+
+// Class-based highlight style so token colors adapt to dark mode via CSS
+// (HighlightStyle with `class` instead of inline colors).
+const helmHighlight = HighlightStyle.define([
+  { tag: tags.keyword, class: "tok-kw" },
+  { tag: [tags.name, tags.variableName, tags.propertyName], class: "tok-var" },
+  { tag: tags.string, class: "tok-str" },
+  { tag: tags.number, class: "tok-num" },
+  { tag: [tags.bool, tags.null], class: "tok-bool" },
+  { tag: tags.comment, class: "tok-comment" },
+  { tag: tags.function(tags.variableName), class: "tok-fn" },
+  { tag: tags.typeName, class: "tok-type" },
+  { tag: tags.operator, class: "tok-op" },
+  { tag: tags.punctuation, class: "tok-punc" },
+  { tag: tags.definition(tags.variableName), class: "tok-def" },
+  { tag: tags.tagName, class: "tok-tag" },
+  { tag: tags.attributeName, class: "tok-attr" },
+]);
 
 // The file as-is (DESIGN.md §12). Markdown renders formatted with select-to-
 // comment (+ a raw/edit toggle); everything else is a CodeMirror code view that
@@ -192,6 +212,7 @@ function CodePane(props: Props & { canEdit: boolean }) {
       doc: file.content,
       extensions: [
         lineNumbers(),
+        syntaxHighlighting(helmHighlight),
         selField,
         threadPlugin(ctx),
         EditorView.domEventHandlers({
