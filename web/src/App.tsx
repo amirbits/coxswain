@@ -15,6 +15,7 @@ export default function App() {
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [showIntent, setShowIntent] = useState(true);
   const [showReview, setShowReview] = useState(true);
+  const [showResolved, setShowResolved] = useState(false);
 
   const baseRef = useRef<string | null>(base);
   baseRef.current = base;
@@ -150,6 +151,7 @@ export default function App() {
             activeThreadId={activeThreadId}
             onFocusThread={focusThread}
             onAddComment={addDiffComment}
+            showResolved={showResolved}
           />
         </div>
         {showReview && (
@@ -159,6 +161,8 @@ export default function App() {
               actions={actions}
               activeThreadId={activeThreadId}
               onFocus={focusThread}
+              showResolved={showResolved}
+              onToggleResolved={() => setShowResolved((s) => !s)}
             />
           </div>
         )}

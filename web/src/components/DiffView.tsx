@@ -20,6 +20,7 @@ export function DiffView({
   activeThreadId,
   onFocusThread,
   onAddComment,
+  showResolved,
 }: {
   diff: DiffPayload;
   threads: DecoratedThread[];
@@ -27,12 +28,17 @@ export function DiffView({
   activeThreadId: string | null;
   onFocusThread: (id: string) => void;
   onAddComment: (locator: LineRange, context: string, text: string) => Promise<void>;
+  showResolved: boolean;
 }) {
   const files = useMemo(() => safeParse(diff.raw), [diff.raw]);
   const [sel, setSel] = useState<Sel | null>(null);
 
+  // Resolved threads are hidden inline by default, matching the Review panel.
   const diffThreads = threads.filter(
-    (t) => t.anchor.view === "diff" && t.anchor.locator.kind === "lines",
+    (t) =>
+      t.anchor.view === "diff" &&
+      t.anchor.locator.kind === "lines" &&
+      (showResolved || t.effectiveStatus !== "resolved"),
   );
 
   return (
