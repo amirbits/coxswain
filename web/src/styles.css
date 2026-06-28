@@ -685,6 +685,83 @@ code {
   color: var(--faint);
 }
 
+/* Suggested edits ------------------------------------------------------ */
+
+.suggestion {
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+.suggestion.applied {
+  opacity: 0.8;
+}
+.suggestion.dismissed {
+  opacity: 0.55;
+}
+.suggestion-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  background: #fbfaf7;
+  border-bottom: 1px solid var(--line);
+}
+.suggestion-label {
+  font-size: 10.5px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+}
+.sug-status {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+.sug-status.proposed {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.sug-status.applied {
+  color: var(--resolved);
+  background: var(--resolved-soft);
+}
+.sug-status.dismissed {
+  color: var(--muted);
+  background: #efeee9;
+}
+.suggestion-diff {
+  padding: 6px 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.sdiff {
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 0 4px;
+  border-radius: 3px;
+}
+.sdiff.del {
+  background: #fdeff0;
+  color: #9f1239;
+}
+.sdiff.add {
+  background: #eaffee;
+  color: #14532d;
+}
+.suggestion-actions {
+  display: flex;
+  gap: 6px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--line);
+}
+
 /* Boot ----------------------------------------------------------------- */
 
 .boot {

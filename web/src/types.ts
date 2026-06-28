@@ -30,7 +30,20 @@ export type Anchor = {
   locator: Locator;
 };
 
-export type Message = { author: Author; body: string; ts: string };
+export type SuggestionStatus = "proposed" | "applied" | "dismissed";
+
+export type Suggestion = {
+  base: string;
+  newText: string;
+  status: SuggestionStatus;
+};
+
+export type Message = {
+  author: Author;
+  body: string;
+  ts: string;
+  suggestion?: Suggestion;
+};
 
 export type DecoratedThread = {
   id: string;

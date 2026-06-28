@@ -270,3 +270,63 @@ the surface never sees.
    agent-legible, messier to parse). Start JSON; revisit if the agent struggles.
 3. SSE vs WebSocket for live updates — SSE is simpler and sufficient for v1.
 4. Port selection / auto-open-browser behavior on `helm` launch.
+
+## 11. Agent interface — CLI + suggested edits (Phase 1.5)
+
+Phase 1.5 gives the agent a first-class way to participate without inventing a
+protocol: a CLI that is a **fourth front door onto the one function registry**
+(§5), plus **suggested edits** as a new kind of thread message.
+
+### CLI = the registry, one-shot
+
+`helm` with no verb serves the UI (unchanged). `helm <verb> [args] [--json]` runs a
+single registry call against the working tree and exits — **no server required**.
+Because truth is the filesystem, the CLI and the UI stay in sync through the files,
+not through each other: a `helm reply` writes `.reviews/`, the watcher fires, and any
+open browser repaints. Output is readable text by default, `--json` for parsing. IDs
+accept any unique prefix (like git).
+
+| Verb | Registry fn | Notes |
+|---|---|---|
+| `context` | `getState` | intent + diff summary + open comments, one shot |
+| `status` | `repoStatus` | branch, change count, comment counts |
+| `intent` / `diff` | `getIntent` / `showDiff` | raw projections (`diff --base R`) |
+| `comments` | `listThreads` | open + outdated by default; `--all` for resolved |
+| `show <id>` | `getThread` | one thread, decorated, with any suggestion |
+| `reply <id> <text>` | `replyComment` | author forced to `agent` |
+| `suggest <id> <text>` | `suggestEdit` | `--stdin` / `--file` for the new text; `--base` to set what it replaces |
+| `apply <id>` | `applySuggestion` | write-through; never commits |
+| `dismiss <id>` | `dismissSuggestion` | |
+| `resolve` / `reopen <id>` | `resolve/reopenComment` | |
+
+### Suggested edits live in the thread
+
+A suggestion is a normal message that also carries a proposed replacement:
+
+```jsonc
+{ "author": "agent", "body": "Batch the fetch — proposed below.", "ts": "…",
+  "suggestion": {
+    "base":    "for (const id of ids) { await fetch(id); }",  // exact current text
+    "newText": "await fetchMany(ids);",
+    "status":  "proposed"   // proposed | applied | dismissed
+  } }
+```
+
+- **Apply** replaces the unique occurrence of `base` with `newText` in the thread's
+  target file (`locator.path`, or `INTENT.md` for intent), then write-throughs. It
+  **refuses** if `base` is missing (drifted → *stale*) or appears more than once
+  (ambiguous) — the same content-based safety as comment "outdated", reused.
+- `base` is captured from the anchored region at suggest-time (file lines for code;
+  the quote for intent) or supplied explicitly with `--base`. Using literal text,
+  not line numbers, makes apply drift-safe and sidesteps the diff-marker /
+  markdown-source fidelity traps entirely.
+- Applying edits the **working tree only**; acceptance is still the human's commit
+  (§7). The thread now records the proposal, its rationale, and whether it was taken.
+
+### Non-goals (kept deliberately small)
+
+- Suggestions are **single-region replacements** — the thing the comment is about —
+  not multi-file patches. For broader changes the agent edits directly and you review
+  the diff. Two clean modes: **suggest** (scoped, non-destructive, apply-on-click) vs
+  **edit** (direct, you commit/restore). Both end at the same boundary: your commit.
+- `apply` never commits, and the CLI exposes no commit verb.

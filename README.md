@@ -43,6 +43,35 @@ Flags (`helm --help`): `--port <n>`, `--base <ref>` (PR-style `base...HEAD` diff
    edits files, optionally appends replies. The UI repaints — no refresh.
 5. When you are satisfied, **you** `git commit`. That is acceptance.
 
+## Agent CLI
+
+The cleanest way for an agent to participate is the `helm` subcommands — the same
+function registry the UI uses, exposed as one-shot commands that work with or without
+the server running (run `helm help` for the full list):
+
+```sh
+helm context            # orient: intent + changed files + open comments, in one shot
+helm comments           # list open review threads (--all to include resolved)
+helm show <id>          # one thread in full (id = any unique prefix, like git)
+helm reply <id> "…"     # answer a thread, as the agent
+helm suggest <id> "…"   # propose a replacement for the thread's region (--stdin / --base)
+helm apply <id>         # apply that suggestion to the file (you still commit to accept)
+helm resolve <id>       # mark it done
+helm <verb> --json      # structured output, for parsing
+```
+
+A **suggested edit** is the non-destructive option: the agent proposes a
+`base → newText` replacement (stored in the thread), and you **Apply** it with one
+click in the UI — or `helm apply`. Applying write-throughs to the working tree;
+acceptance is still your commit. To change files directly instead, the agent just
+edits them and you review the diff.
+
+Paste-to-your-agent:
+
+> Run `helm context` to orient, then `helm comments`. For each open thread, either
+> `helm reply <id> "…"` with an answer, or make the change — directly (edit the files)
+> or as a `helm suggest <id> --stdin` proposal. Never `git commit`.
+
 ## How the agent participates
 
 Comments live in-repo as plain JSON, so the agent needs no special API — just the

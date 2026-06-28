@@ -46,3 +46,18 @@ agent reads `.reviews/`, edits files, and the UI repaints live.
 
 Driving the agent, a code-file view, multi-workspace `git worktree` orchestration, and
 a command palette are designed but deliberately deferred.
+
+## Agents steer through the surface, not around it
+
+Steering must flow through the surface, or the decision log becomes fiction. So an
+agent gets a small CLI — `helm <verb>` — that is the *same* function registry the UI
+uses, just a different front door (no new protocol, no daemon). An agent can:
+
+- **orient** — `helm context` / `helm comments`: read the intent, the diff, and the open threads;
+- **respond** — `helm reply <id>`: answer a thread;
+- **propose** — `helm suggest <id>`: offer a non-destructive edit you Apply with one click.
+
+All of it is reading and writing the same files (`.reviews/`, the working tree) the
+views are projected from. A **suggested edit** is a proposed `base → newText`
+replacement that lives in the comment thread; applying it write-throughs to the file.
+Like everything the agent does, it **never commits** — you accept by committing.

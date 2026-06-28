@@ -54,6 +54,8 @@ export default function App() {
     reply: (id, text) => act("replyComment", { id, text }),
     resolve: (id) => act("resolveComment", { id }),
     reopen: (id) => act("reopenComment", { id }),
+    apply: (id) => act("applySuggestion", { id }),
+    dismiss: (id) => act("dismissSuggestion", { id }),
   };
 
   const diffVersion = () =>

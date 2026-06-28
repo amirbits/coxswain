@@ -39,10 +39,24 @@ export type Anchor = {
 
 // Threads --------------------------------------------------------------------
 
+export type SuggestionStatus = "proposed" | "applied" | "dismissed";
+
+// A proposed, non-destructive replacement for a thread's anchored region, living
+// on the message that carries it. Applying it write-throughs to the file
+// (DESIGN.md §11). `base` is the exact current text to replace — drift-safe and
+// free of diff-marker / markdown-source ambiguity, because the agent (which read
+// the file) supplies it.
+export type Suggestion = {
+  base: string;
+  newText: string;
+  status: SuggestionStatus;
+};
+
 export type Message = {
   author: Author;
   body: string;
   ts: string; // ISO 8601
+  suggestion?: Suggestion;
 };
 
 export type Thread = {

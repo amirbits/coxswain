@@ -4,8 +4,22 @@
 import { createServer as netServer } from "node:net";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
+import { runCli } from "./cli";
 import { repoRoot } from "./git";
 import { startServer } from "./server";
+
+// Subcommands (the agent CLI) are a fourth front door onto the function
+// registry; bare `helm` serves the UI (DESIGN.md §5, §11).
+const VERBS = new Set([
+  "context", "status", "intent", "diff", "comments", "show",
+  "reply", "suggest", "apply", "dismiss", "resolve", "reopen", "help",
+]);
+const firstArg = Bun.argv[2];
+if (firstArg && !firstArg.startsWith("-")) {
+  if (VERBS.has(firstArg)) process.exit(await runCli(Bun.argv.slice(2)));
+  console.error(`helm: unknown command "${firstArg}". Run \`helm help\`, or \`helm\` to serve the UI.`);
+  process.exit(1);
+}
 
 const HELP = `helm — a local-first command-and-control workspace for agentic work
 

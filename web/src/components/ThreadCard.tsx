@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { DecoratedThread } from "../types";
+import type { DecoratedThread, Suggestion } from "../types";
 import { basename, timeAgo, truncate } from "../util";
 import { Composer } from "./Composer";
 
@@ -7,6 +7,8 @@ export type ThreadActions = {
   reply: (id: string, text: string) => Promise<void> | void;
   resolve: (id: string) => Promise<void> | void;
   reopen: (id: string) => Promise<void> | void;
+  apply: (id: string) => Promise<void> | void;
+  dismiss: (id: string) => Promise<void> | void;
 };
 
 export function ThreadCard({
@@ -54,6 +56,13 @@ export function ThreadCard({
               <span className="when">{timeAgo(m.ts)}</span>
             </div>
             <div className="msg-body">{m.body}</div>
+            {m.suggestion && (
+              <SuggestionBlock
+                s={m.suggestion}
+                onApply={() => actions.apply(thread.id)}
+                onDismiss={() => actions.dismiss(thread.id)}
+              />
+            )}
           </div>
         ))}
       </div>
@@ -85,6 +94,49 @@ export function ThreadCard({
           }}
           onCancel={() => setReplying(false)}
         />
+      )}
+    </div>
+  );
+}
+
+// A suggested edit: the proposed base -> newText replacement, with Apply
+// (write-through to the file) / Dismiss when still pending.
+function SuggestionBlock({
+  s,
+  onApply,
+  onDismiss,
+}: {
+  s: Suggestion;
+  onApply: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <div className={`suggestion ${s.status}`}>
+      <div className="suggestion-head">
+        <span className="suggestion-label">suggested edit</span>
+        <span className={`sug-status ${s.status}`}>{s.status}</span>
+      </div>
+      <div className="suggestion-diff">
+        {s.base.split("\n").map((l, i) => (
+          <div className="sdiff del" key={`b${i}`}>
+            - {l}
+          </div>
+        ))}
+        {s.newText.split("\n").map((l, i) => (
+          <div className="sdiff add" key={`n${i}`}>
+            + {l}
+          </div>
+        ))}
+      </div>
+      {s.status === "proposed" && (
+        <div className="suggestion-actions">
+          <button className="btn small primary" onClick={onApply}>
+            Apply
+          </button>
+          <button className="btn small ghost" onClick={onDismiss}>
+            Dismiss
+          </button>
+        </div>
       )}
     </div>
   );
