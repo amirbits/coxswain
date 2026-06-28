@@ -16,6 +16,16 @@
   --outdated-soft: #fef3c7;
   --resolved: #15803d;
   --resolved-soft: #dcfce7;
+  /* semantic surfaces that switch with the theme */
+  --subtle: #fbfaf7;
+  --code-bg: #f1f0ec;
+  --hover: #efeee9;
+  --glass: rgba(255, 255, 255, 0.92);
+  --error-bg: #fef2f2;
+  --error-fg: #b91c1c;
+  --error-line: #fecaca;
+  --ok-bg: #f0fdf4;
+  --ok-line: #bbf7d0;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
@@ -48,7 +58,7 @@ body {
 code {
   font-family: var(--mono);
   font-size: 0.9em;
-  background: #f1f0ec;
+  background: var(--code-bg);
   padding: 0.1em 0.35em;
   border-radius: 4px;
 }
@@ -68,7 +78,7 @@ code {
   white-space: nowrap;
 }
 .btn:hover {
-  background: #faf9f6;
+  background: var(--hover);
   border-color: var(--faint);
 }
 .btn:disabled {
@@ -89,7 +99,7 @@ code {
   color: var(--muted);
 }
 .btn.ghost:hover {
-  background: #efeee9;
+  background: var(--hover);
   color: var(--ink);
 }
 .btn.small {
@@ -196,17 +206,17 @@ code {
 }
 
 .error-bar {
-  background: #fef2f2;
-  color: #b91c1c;
+  background: var(--error-bg);
+  color: var(--error-fg);
   padding: 7px 16px;
-  border-bottom: 1px solid #fecaca;
+  border-bottom: 1px solid var(--error-line);
   font-size: 13px;
 }
 
 .loop-hint {
   font-size: 12.5px;
   color: var(--muted);
-  background: #fbfaf7;
+  background: var(--subtle);
   border-bottom: 1px solid var(--line);
   padding: 7px 16px;
   display: flex;
@@ -262,7 +272,7 @@ code {
   align-items: center;
   gap: 10px;
   padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--glass);
   backdrop-filter: blur(6px);
   border-bottom: 1px solid var(--line);
 }
@@ -278,7 +288,7 @@ code {
   font-size: 11.5px;
   font-family: var(--mono);
   color: var(--muted);
-  background: #f1f0ec;
+  background: var(--code-bg);
   padding: 2px 8px;
   border-radius: 999px;
 }
@@ -313,7 +323,7 @@ code {
   font-size: 13px;
   line-height: 1.6;
   color: var(--ink);
-  background: #fbfaf7;
+  background: var(--subtle);
 }
 .selection-bar {
   position: sticky;
@@ -375,7 +385,7 @@ code {
   color: var(--muted);
 }
 .markdown pre {
-  background: #f7f6f2;
+  background: var(--code-bg);
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 12px;
@@ -423,7 +433,7 @@ code {
   align-items: center;
   gap: 10px;
   padding: 8px 12px;
-  background: #fbfaf7;
+  background: var(--subtle);
   border-bottom: 1px solid var(--line);
   font-size: 13px;
 }
@@ -438,7 +448,7 @@ code {
   letter-spacing: 0.4px;
   padding: 1px 7px;
   border-radius: 5px;
-  background: #e8e7e1;
+  background: var(--code-bg);
   color: var(--muted);
 }
 .ftype.add {
@@ -446,8 +456,8 @@ code {
   color: var(--resolved);
 }
 .ftype.delete {
-  background: #fee2e2;
-  color: #b91c1c;
+  background: var(--error-bg);
+  color: var(--error-fg);
 }
 .ftype.modify {
   background: var(--open-soft);
@@ -461,7 +471,7 @@ code {
   color: var(--resolved);
 }
 .fstat .del {
-  color: #b91c1c;
+  color: var(--error-fg);
 }
 
 .diff {
@@ -479,7 +489,7 @@ code {
   color: var(--accent);
 }
 .diff-widget-content {
-  background: #fbfaf7;
+  background: var(--subtle);
   border-top: 1px dashed var(--line-strong);
   border-bottom: 1px dashed var(--line-strong);
 }
@@ -514,7 +524,7 @@ code {
   align-items: center;
   gap: 10px;
   padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--glass);
   backdrop-filter: blur(6px);
   border-bottom: 1px solid var(--line);
 }
@@ -553,7 +563,7 @@ code {
 }
 .thread.outdated {
   border-left-color: var(--outdated);
-  background: #fffdf7;
+  background: var(--subtle);
 }
 .thread.resolved {
   border-left-color: var(--resolved);
@@ -582,7 +592,7 @@ code {
   color: var(--open);
 }
 .badge.intent {
-  background: #f0fdf4;
+  background: var(--ok-bg);
   color: var(--resolved);
 }
 .thread-where {
@@ -698,7 +708,7 @@ code {
   border: 1px solid var(--line);
   border-radius: 8px;
   overflow: hidden;
-  background: #fff;
+  background: var(--panel);
 }
 .suggestion.applied {
   opacity: 0.8;
@@ -711,7 +721,7 @@ code {
   align-items: center;
   gap: 8px;
   padding: 5px 10px;
-  background: #fbfaf7;
+  background: var(--subtle);
   border-bottom: 1px solid var(--line);
 }
 .suggestion-label {
@@ -739,7 +749,7 @@ code {
 }
 .sug-status.dismissed {
   color: var(--muted);
-  background: #efeee9;
+  background: var(--hover);
 }
 .suggestion-diff {
   padding: 6px 8px;
@@ -754,12 +764,12 @@ code {
   border-radius: 3px;
 }
 .sdiff.del {
-  background: #fdeff0;
-  color: #9f1239;
+  background: var(--error-bg);
+  color: var(--error-fg);
 }
 .sdiff.add {
-  background: #eaffee;
-  color: #14532d;
+  background: var(--ok-bg);
+  color: var(--resolved);
 }
 .suggestion-actions {
   display: flex;
@@ -778,7 +788,7 @@ code {
   color: var(--muted);
 }
 .boot .error {
-  color: #b91c1c;
+  color: var(--error-fg);
 }
 
 /* §12: explorer + file view + mode bar -------------------------------- */
@@ -809,7 +819,7 @@ code {
   overflow: hidden;
 }
 .row:hover {
-  background: #f3f2ee;
+  background: var(--code-bg);
 }
 .row.file.selected {
   background: var(--accent-soft);
@@ -843,7 +853,7 @@ code {
   color: var(--accent);
 }
 .gstatus.D {
-  color: #b91c1c;
+  color: var(--error-fg);
 }
 .gstatus.R,
 .gstatus.C {
@@ -954,7 +964,7 @@ code {
   flex: 1;
 }
 .code-line.sel {
-  background: #eef2ff;
+  background: var(--accent-soft);
 }
 .markdown-wrap {
   padding: 8px 18px 64px;
@@ -1095,7 +1105,18 @@ code {
 .cm-editor-host .cm-editor {
   height: 100%;
   background: var(--panel);
+  color: var(--ink);
 }
+.cm-editor .cm-content { caret-color: var(--ink); }
+.cm-editor .cm-selectionBackground { background: #d7d4f0; }
+.cm-editor.cm-focused .cm-selectionBackground { background: #c9c6ee; }
+.cm-editor .cm-cursor { border-left-color: var(--ink); }
+.cm-editor .cm-activeLine { background: rgba(0, 0, 0, 0.03); }
+.cm-editor .cm-activeLineGutter { background: rgba(0, 0, 0, 0.03); }
+[data-theme="dark"] .cm-editor .cm-selectionBackground { background: #3a3a48; }
+[data-theme="dark"] .cm-editor.cm-focused .cm-selectionBackground { background: #454556; }
+[data-theme="dark"] .cm-editor .cm-activeLine,
+[data-theme="dark"] .cm-editor .cm-activeLineGutter { background: rgba(255, 255, 255, 0.04); }
 .cm-editor-host .cm-editor .cm-scroller {
   font-family: var(--mono);
   font-size: 12.5px;
@@ -1112,7 +1133,7 @@ code {
 .cm-editor .tok-def { color: #1d4ed8; }
 .cm-editor .tok-op { color: #6b6b78; }
 .cm-editor .tok-punc { color: #6b6b78; }
-.cm-editor .tok-tag { color: #b91c1c; }
+.cm-editor .tok-tag { color: var(--error-fg); }
 .cm-editor .tok-attr { color: #7c3aed; }
 .cm-editor .tok-var { color: var(--ink); }
 [data-theme="dark"] .cm-editor .tok-kw { color: #b794f6; }
@@ -1166,7 +1187,7 @@ code {
   padding-left: 1.3em;
 }
 .msg-body.md pre {
-  background: #f1f0ec;
+  background: var(--code-bg);
   padding: 8px 10px;
   border-radius: 6px;
   overflow: auto;
@@ -1176,7 +1197,7 @@ code {
 .msg-body.md code {
   font-family: var(--mono);
   font-size: 0.9em;
-  background: #f1f0ec;
+  background: var(--code-bg);
   padding: 0.1em 0.35em;
   border-radius: 4px;
 }
@@ -1202,22 +1223,37 @@ code {
   --outdated-soft: #3a2e1c;
   --resolved: #5db98a;
   --resolved-soft: #1f3a2c;
+  --subtle: #232329;
+  --code-bg: #2a2a32;
+  --hover: #2f2f38;
+  --glass: rgba(28, 28, 34, 0.92);
+  --error-bg: #3a2020;
+  --error-fg: #fca5a5;
+  --error-line: #522;
+  --ok-bg: #1f3a2c;
+  --ok-line: #2c5a3e;
 }
 [data-theme="dark"] body {
   background: var(--bg);
-}
-[data-theme="dark"] .loop-hint,
-[data-theme="dark"] .error-bar {
-  background: #232329;
-}
-[data-theme="dark"] code,
-[data-theme="dark"] .msg-body.md pre,
-[data-theme="dark"] .msg-body.md code {
-  background: #2a2a32;
 }
 [data-theme="dark"] .cm-threads {
   background: rgba(255, 255, 255, 0.02);
 }
 [data-theme="dark"] .toast.ok {
   background: var(--resolved);
+}
+/* react-diff-view is driven by --diff-* CSS vars; override them in dark mode
+   (scoped under .diff for specificity over the library's :root defaults). */
+[data-theme="dark"] .diff {
+  --diff-text-color: var(--ink);
+  --diff-selection-background-color: #2a2a44;
+  --diff-gutter-insert-background-color: #1f3a2c;
+  --diff-gutter-delete-background-color: #3a2020;
+  --diff-gutter-selected-background-color: #2a2a44;
+  --diff-code-insert-background-color: #16291d;
+  --diff-code-delete-background-color: #2c181a;
+  --diff-code-selected-background-color: #232346;
+  --diff-code-insert-edit-background-color: #3a6b4a;
+  --diff-code-delete-edit-background-color: #7a3a3e;
+  --diff-omit-gutter-line-color: #7a3a3e;
 }
