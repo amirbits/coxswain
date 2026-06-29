@@ -88,7 +88,9 @@ export async function listRefs(root: string): Promise<{ branches: string[]; tags
   return {
     branches: lines(b.stdout),
     tags: lines(t.stdout),
-    remoteBranches: lines(rb.stdout).filter((x) => !x.endsWith("/HEAD")),
+    // `branch -r --format=%(refname:short)` renders the origin/HEAD symref as a
+    // bare "origin" (no slash) — drop it (and any explicit */HEAD).
+    remoteBranches: lines(rb.stdout).filter((x) => x.includes("/") && !x.endsWith("/HEAD")),
   };
 }
 
