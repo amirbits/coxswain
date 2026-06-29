@@ -772,6 +772,26 @@ code {
   background: var(--ok-bg);
   color: var(--resolved);
 }
+.sdiff + .sdiff {
+  margin-top: 2px;
+}
+/* word-level highlight: the exact changed spans inside a before/after block */
+.sdiff .wd {
+  border-radius: 2px;
+  padding: 0 1px;
+}
+.sdiff.del .wd {
+  background: rgba(220, 38, 38, 0.26);
+}
+.sdiff.add .wd {
+  background: rgba(22, 163, 74, 0.26);
+}
+[data-theme="dark"] .sdiff.del .wd {
+  background: rgba(248, 113, 113, 0.32);
+}
+[data-theme="dark"] .sdiff.add .wd {
+  background: rgba(74, 222, 128, 0.28);
+}
 .suggestion-actions {
   display: flex;
   gap: 6px;

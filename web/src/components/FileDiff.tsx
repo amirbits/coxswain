@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from "react";
-import { Diff, Hunk, getChangeKey } from "react-diff-view";
+import { useMemo, useState, type ReactNode } from "react";
+import { Diff, Hunk, getChangeKey, markEdits, tokenize } from "react-diff-view";
 import type { ChangeData, FileData } from "react-diff-view";
 import "react-diff-view/style/index.css";
 import type { DecoratedThread, NewComment } from "../types";
@@ -26,6 +26,16 @@ export function FileDiff({ path, file, threads, actions, activeThreadId, onFocus
   const [sel, setSel] = useState<Sel | null>(null);
   const flat = file.hunks.flatMap((h) => h.changes);
   const active = sel ? computeRange(flat, sel) : null;
+
+  // Intra-line ("word") highlighting: react-diff-view refines each changed line to
+  // the exact edited spans. Guarded — tokenize can throw on pathological input.
+  const tokens = useMemo(() => {
+    try {
+      return tokenize(file.hunks, { enhancers: [markEdits(file.hunks, { type: "block" })] });
+    } catch {
+      return undefined;
+    }
+  }, [file.hunks]);
 
   const byKey: Record<string, DecoratedThread[]> = {};
   for (const t of threads) {
@@ -73,6 +83,7 @@ export function FileDiff({ path, file, threads, actions, activeThreadId, onFocus
       diffType={file.type}
       viewType="unified"
       hunks={file.hunks}
+      tokens={tokens}
       selectedChanges={active ? active.keys : []}
       widgets={widgets}
       gutterEvents={{

@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { DecoratedThread, Suggestion } from "../types";
 import { basename, timeAgo, truncate } from "../util";
+import { wordDiff } from "../worddiff";
 import { Composer } from "./Composer";
 
 export type ThreadActions = {
@@ -100,6 +101,7 @@ export function ThreadCard({
 }
 
 function SuggestionBlock({ s, onApply, onDismiss }: { s: Suggestion; onApply: () => void; onDismiss: () => void }) {
+  const { del, ins } = useMemo(() => wordDiff(s.base, s.newText), [s.base, s.newText]);
   return (
     <div className={`suggestion ${s.status}`}>
       <div className="suggestion-head">
@@ -107,16 +109,16 @@ function SuggestionBlock({ s, onApply, onDismiss }: { s: Suggestion; onApply: ()
         <span className={`sug-status ${s.status}`}>{s.status}</span>
       </div>
       <div className="suggestion-diff">
-        {s.base.split("\n").map((l, i) => (
-          <div className="sdiff del" key={`b${i}`}>
-            - {l}
+        {s.base !== "" && (
+          <div className="sdiff del">
+            {del.map((seg, i) => (seg.changed ? <span className="wd" key={i}>{seg.text}</span> : <span key={i}>{seg.text}</span>))}
           </div>
-        ))}
-        {s.newText.split("\n").map((l, i) => (
-          <div className="sdiff add" key={`n${i}`}>
-            + {l}
+        )}
+        {s.newText !== "" && (
+          <div className="sdiff add">
+            {ins.map((seg, i) => (seg.changed ? <span className="wd" key={i}>{seg.text}</span> : <span key={i}>{seg.text}</span>))}
           </div>
-        ))}
+        )}
       </div>
       {s.status === "proposed" && (
         <div className="suggestion-actions">
