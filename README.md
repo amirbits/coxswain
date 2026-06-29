@@ -20,6 +20,12 @@ bun run build            # builds the UI, embeds it, compiles ./helm
 cd ~/your-repo && /path/to/helm
 ```
 
+Install on your `PATH` so you can run `helm` from any repo:
+
+```sh
+bun run install:global   # symlinks helm → ~/.local/bin (rebuild updates it)
+```
+
 Dev with live reload: `bun run dev` (Vite on :5173, API on :4317).
 
 Flags: `--port <n>`, `--base <ref>`, `--dir <path>`, `--no-open`.

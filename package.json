@@ -9,6 +9,7 @@
     "server": "bun run server/index.ts",
     "build": "bun run scripts/build.ts",
     "start": "./helm",
+    "install:global": "bun run build && mkdir -p ~/.local/bin && ln -sf \"$PWD/helm\" ~/.local/bin/helm && echo '✓ linked helm → ~/.local/bin/helm (ensure ~/.local/bin is on PATH)'",
     "test": "bun test",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p web/tsconfig.json --noEmit"
   },
