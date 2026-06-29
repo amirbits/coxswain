@@ -32,6 +32,15 @@ export async function fetchWorkspace(mode: DiffMode): Promise<Workspace> {
   return res.json();
 }
 
+export type ChangesPayload = { raw: string; mode: DiffMode; head: string | null };
+
+// The whole-changeset diff for the active mode (the continuous "All changes" view).
+export async function fetchChanges(mode: DiffMode): Promise<ChangesPayload> {
+  const res = await fetch(`/api/changes?${modeParams(mode)}`);
+  if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error || `changes ${res.status}`);
+  return res.json();
+}
+
 export async function fetchFile(path: string, mode: DiffMode): Promise<FilePayload> {
   const res = await fetch(`/api/file?path=${encodeURIComponent(path)}&${modeParams(mode)}`);
   if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error || `file ${res.status}`);

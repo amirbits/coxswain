@@ -8,6 +8,7 @@ import { getEmbedded, hasEmbedded } from "./assets";
 import { buildRegistry } from "./capabilities";
 import { parseMode } from "./mode";
 import { SSEHub } from "./sse";
+import { diffAll } from "./git";
 import { Store } from "./store";
 import type { DiffMode } from "./types";
 import { startWatcher } from "./watcher";
@@ -65,6 +66,14 @@ export async function startServer(opts: ServerOptions) {
         if (!path) return json({ error: "path required" }, 400);
         try {
           return json(await getFile(root, store, path, modeFromQuery(url)));
+        } catch (e) {
+          return json({ error: errMsg(e) }, 400);
+        }
+      }
+
+      if (pathname === "/api/changes") {
+        try {
+          return json(await diffAll(root, modeFromQuery(url)));
         } catch (e) {
           return json({ error: errMsg(e) }, 400);
         }

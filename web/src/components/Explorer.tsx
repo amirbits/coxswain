@@ -1,9 +1,9 @@
 import { useState } from "react";
 import type { TreeEntry } from "../types";
 
-// File explorer. Files are decorated with their change status (in the active diff
-// mode) and a comment badge. INTENT.md is pinned at the top so the spec stays
-// prominent (DESIGN.md §12). Click a file to open it in the main pane.
+// File explorer. A pinned "All changes" row opens the continuous changeset diff;
+// INTENT.md is pinned next. Files are decorated with their change status (in the
+// active mode) and a comment badge. Click a file to open it (DESIGN.md §12).
 
 type Node = { name: string; path: string; entry?: TreeEntry; children: Node[] };
 
@@ -39,16 +39,21 @@ function buildTree(entries: TreeEntry[]): Node {
 
 export function Explorer({
   tree,
-  selectedPath,
+  activeKey,
+  changesActive,
   onSelect,
+  onOpenChanges,
 }: {
   tree: TreeEntry[];
-  selectedPath: string | null;
+  activeKey: string | null; // active file path, for highlight
+  changesActive: boolean;
   onSelect: (path: string) => void;
+  onOpenChanges: () => void;
 }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const root = buildTree(tree);
   const intent = tree.find((e) => e.path === "INTENT.md");
+  const changedCount = tree.filter((e) => e.status).length;
 
   const toggle = (path: string) =>
     setCollapsed((prev) => {
@@ -61,24 +66,18 @@ export function Explorer({
     <aside className="explorer">
       <div className="panel-head">
         <h2>Files</h2>
-        <span className="counts">{tree.filter((e) => e.status).length} changed</span>
+        <span className="counts">{changedCount} changed</span>
       </div>
       <div className="tree">
-        {intent && (
-          <FileRow entry={intent} depth={0} pinned selected={selectedPath === "INTENT.md"} onSelect={onSelect} />
-        )}
+        <div className={`row file changes-row${changesActive ? " selected" : ""}`} onClick={onOpenChanges} title="all changed files in one scroll">
+          <span className="name">✦ All changes</span>
+          {changedCount > 0 && <span className="cbadge">{changedCount}</span>}
+        </div>
+        {intent && <FileRow entry={intent} depth={0} pinned selected={activeKey === "INTENT.md"} onSelect={onSelect} />}
         {root.children
           .filter((n) => n.path !== "INTENT.md")
           .map((n) => (
-            <TreeNode
-              key={n.path}
-              node={n}
-              depth={0}
-              collapsed={collapsed}
-              toggle={toggle}
-              selectedPath={selectedPath}
-              onSelect={onSelect}
-            />
+            <TreeNode key={n.path} node={n} depth={0} collapsed={collapsed} toggle={toggle} activeKey={activeKey} onSelect={onSelect} />
           ))}
       </div>
     </aside>
@@ -90,19 +89,19 @@ function TreeNode({
   depth,
   collapsed,
   toggle,
-  selectedPath,
+  activeKey,
   onSelect,
 }: {
   node: Node;
   depth: number;
   collapsed: Set<string>;
   toggle: (path: string) => void;
-  selectedPath: string | null;
+  activeKey: string | null;
   onSelect: (path: string) => void;
 }) {
   const isFolder = node.children.length > 0;
   if (!isFolder && node.entry) {
-    return <FileRow entry={node.entry} depth={depth} selected={selectedPath === node.path} onSelect={onSelect} />;
+    return <FileRow entry={node.entry} depth={depth} selected={activeKey === node.path} onSelect={onSelect} />;
   }
   const isCollapsed = collapsed.has(node.path);
   return (
@@ -113,15 +112,7 @@ function TreeNode({
       </div>
       {!isCollapsed &&
         node.children.map((c) => (
-          <TreeNode
-            key={c.path}
-            node={c}
-            depth={depth + 1}
-            collapsed={collapsed}
-            toggle={toggle}
-            selectedPath={selectedPath}
-            onSelect={onSelect}
-          />
+          <TreeNode key={c.path} node={c} depth={depth + 1} collapsed={collapsed} toggle={toggle} activeKey={activeKey} onSelect={onSelect} />
         ))}
     </>
   );

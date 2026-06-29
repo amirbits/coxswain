@@ -997,6 +997,148 @@ code {
   padding: 6px 0 48px;
 }
 
+/* Tabs + main header --------------------------------------------------- */
+
+.main-header {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 12px 4px 6px;
+  min-height: 38px;
+  background: var(--glass);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--line);
+}
+.tabbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  flex: 1;
+  min-width: 0;
+}
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px 5px 11px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  cursor: pointer;
+  white-space: nowrap;
+  color: var(--muted);
+}
+.tab:hover {
+  background: var(--hover);
+}
+.tab.active {
+  background: var(--accent-soft);
+  border-color: #c7d2fe;
+  color: var(--accent);
+}
+[data-theme="dark"] .tab.active {
+  border-color: #4f4f6a;
+}
+.tab-label {
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+.tab-close {
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  border: none;
+  background: none;
+  color: var(--faint);
+  cursor: pointer;
+  padding: 0 2px;
+  border-radius: 4px;
+}
+.tab-close:hover {
+  background: var(--line-strong);
+  color: var(--ink);
+}
+.active-ctl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+/* All-changes view ----------------------------------------------------- */
+
+.changes-view {
+  padding-bottom: 48px;
+}
+.changes-head {
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--line);
+}
+.changes-file {
+  border-bottom: 1px solid var(--line);
+}
+.cf-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  cursor: pointer;
+  background: var(--subtle);
+  font-size: 13px;
+}
+.cf-head:hover {
+  background: var(--hover);
+}
+.cf-head .caret {
+  color: var(--faint);
+  font-size: 10px;
+}
+.cf-head .fpath {
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+.cf-head .ftype,
+.changes-file .ftype {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--code-bg);
+  color: var(--muted);
+}
+.ftype.add {
+  background: var(--resolved-soft);
+  color: var(--resolved);
+}
+.ftype.delete {
+  background: var(--error-bg);
+  color: var(--error-fg);
+}
+.ftype.modify {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.cf-head .fstat {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.cf-head .fstat .add {
+  color: var(--resolved);
+}
+.cf-head .fstat .del {
+  color: var(--error-fg);
+}
+.cf-body {
+  border-top: 1px solid var(--line);
+}
+
 /* === New UI: mode hint, palette, toasts, editor, dark mode =============== */
 
 .mode-hint {
