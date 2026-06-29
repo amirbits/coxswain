@@ -9,7 +9,7 @@ import { ThreadCard, type ThreadActions } from "./ThreadCard";
 // One parsed file's diff (shared by the single-file Diff pane and the continuous
 // "All changes" view). Click a gutter line (shift-click for a range) to comment;
 // threads overlay at their located line. Comments anchor to current-file
-// (new-side) content; deleted lines aren't commentable in v1 (DESIGN.md §12).
+// (new-side) content; deleted lines aren't commentable in v1 (see docs/intent/SPEC.md).
 export type FileDiffProps = {
   path: string;
   file: FileData;

@@ -2,9 +2,9 @@ import { useState } from "react";
 import type { TreeEntry } from "../types";
 
 // File explorer. A pinned "All changes" row opens the continuous changeset diff;
-// INTENT.md is pinned next. Folders collapse/expand; files and folders are shown
+// the intent doc is pinned next. Folders collapse/expand; files and folders are shown
 // with distinct icons, and a collapsed folder that hides changes gets a dot so
-// you can still tell (DESIGN.md §12).
+// you can still tell (see docs/intent/SPEC.md).
 
 type Node = { name: string; path: string; entry?: TreeEntry; children: Node[]; dirty?: boolean };
 
@@ -77,6 +77,7 @@ function FileIcon() {
 
 export function Explorer({
   tree,
+  intentPath,
   activeKey,
   changesActive,
   onSelect,
@@ -84,6 +85,7 @@ export function Explorer({
   onNewTerminal,
 }: {
   tree: TreeEntry[];
+  intentPath: string;
   activeKey: string | null; // active file path, for highlight
   changesActive: boolean;
   onSelect: (path: string) => void;
@@ -91,8 +93,8 @@ export function Explorer({
   onNewTerminal: () => void;
 }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const root = buildTree(tree);
-  const intent = tree.find((e) => e.path === "INTENT.md");
+  const root = buildTree(tree.filter((e) => e.path !== intentPath));
+  const intent = tree.find((e) => e.path === intentPath);
   const changedCount = tree.filter((e) => e.status).length;
 
   const toggle = (path: string) =>
@@ -116,12 +118,10 @@ export function Explorer({
         <div className="row file term-row" onClick={onNewTerminal} title="open a shell in the repo root">
           <span className="name">⌗ New terminal</span>
         </div>
-        {intent && <FileRow entry={intent} depth={0} pinned selected={activeKey === "INTENT.md"} onSelect={onSelect} />}
-        {root.children
-          .filter((n) => n.path !== "INTENT.md")
-          .map((n) => (
-            <TreeNode key={n.path} node={n} depth={0} collapsed={collapsed} toggle={toggle} activeKey={activeKey} onSelect={onSelect} />
-          ))}
+        {intent && <FileRow entry={intent} depth={0} pinned selected={activeKey === intentPath} onSelect={onSelect} />}
+        {root.children.map((n) => (
+          <TreeNode key={n.path} node={n} depth={0} collapsed={collapsed} toggle={toggle} activeKey={activeKey} onSelect={onSelect} />
+        ))}
       </div>
     </aside>
   );

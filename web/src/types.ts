@@ -34,6 +34,7 @@ export type TreeEntry = { path: string; status: ChangeStatus; open: number; outd
 export type RepoInfo = {
   root: string;
   name: string;
+  intentPath: string;
   branch: string;
   head: string | null;
   upstream: string | null;

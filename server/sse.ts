@@ -1,7 +1,7 @@
 // Server-Sent Events hub. Live updates are push-only and carry no payload of
 // substance — a "change" event just tells the client to re-project state from
 // the server (which re-derives it from the working tree). SSE is simpler than
-// WebSocket and sufficient for v1 (DESIGN.md §10).
+// WebSocket and sufficient for v1 (see docs/intent/SPEC.md).
 
 export type ChangeEvent = { type: string; [k: string]: unknown };
 

@@ -1,7 +1,7 @@
 // Embedded terminal: a login shell rooted at the repo, attached to Bun's native
 // PTY (Bun.Terminal / Bun.spawn({ terminal }), POSIX-only), bridged to xterm.js
 // over a WebSocket. One PTY per connection; it dies when the socket closes. Pure
-// Bun — no native addons — so it stays inside the single binary (DESIGN.md §6).
+// Bun — no native addons — so it stays inside the single binary (see docs/intent/SPEC.md).
 
 import type { ServerWebSocket } from "bun";
 

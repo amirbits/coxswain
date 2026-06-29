@@ -1,7 +1,7 @@
 // The two projections the v2 UI fetches: the workspace (explorer tree + repo info
 // + all threads) and a single file (content + its per-mode diff). Both are
 // composed fresh from git + the store on every request — nothing is cached
-// (DESIGN.md §2, §12).
+// (see docs/intent/SPEC.md).
 
 import { basename } from "node:path";
 import { changedFiles, diffFile, fileStatus, listFiles, listRefs, readFileContent, status } from "./git";
@@ -36,7 +36,7 @@ export async function getWorkspace(root: string, store: Store, mode: DiffMode): 
   }));
 
   return {
-    repo: { root, name: basename(root), branch: st.branch, head: st.head, upstream: st.upstream, ahead: st.ahead, behind: st.behind, refs },
+    repo: { root, name: basename(root), intentPath: store.intentRelPath(), branch: st.branch, head: st.head, upstream: st.upstream, ahead: st.ahead, behind: st.behind, refs },
     mode,
     tree,
     threads,

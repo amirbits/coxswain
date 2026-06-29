@@ -1,4 +1,4 @@
-// Shared types. v2 model (DESIGN.md §12): comments anchor to file *content*, so
+// Shared types. v2 model (see docs/intent/SPEC.md): comments anchor to file *content*, so
 // one thread renders in every lens (file view, any diff, the panel). The old
 // per-view anchor (intent quote / diff lines) is read via a compat shim in
 // store.ts and normalized to this shape.
@@ -66,6 +66,7 @@ export type TreeEntry = {
 export type RepoInfo = {
   root: string;
   name: string;
+  intentPath: string; // repo-relative path of the pinned intent doc
   branch: string;
   head: string | null;
   upstream: string | null; // tracking branch, e.g. "origin/main"

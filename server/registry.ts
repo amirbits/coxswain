@@ -1,6 +1,6 @@
 // The function registry: every capability is a deterministic typed function
 // registered exactly once. The command palette, the NL bar, and the agent are
-// three front doors onto this same registry (DESIGN.md §5). The LLM never
+// three front doors onto this same registry (see docs/intent/SPEC.md). The LLM never
 // executes anything here — it only routes to a registered name with args.
 
 export type RegistryFn = (args: any) => unknown | Promise<unknown>;

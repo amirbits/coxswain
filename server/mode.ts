@@ -1,6 +1,6 @@
 // One place that parses a DiffMode. The HTTP query string, the CLI flags, and
 // the registry's `asMode` all funnel through here so the three front doors agree
-// on edge cases (DESIGN.md §5, §12). The projector never receives a
+// on edge cases (see docs/intent/SPEC.md). The projector never receives a
 // half-specified mode: an empty/whitespace ref collapses to null, and a
 // ref-requiring kind (branch/ref) with no ref collapses to "working" — the UI is responsible
 // for disabling the mode switch until a ref is entered, rather than silently

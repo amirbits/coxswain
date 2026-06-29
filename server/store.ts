@@ -1,6 +1,6 @@
-// File store for INTENT.md and the .reviews/ comment threads. Comments live
+// File store for the intent doc and the .reviews/ comment threads. Comments live
 // in-repo as plain JSON. On read, threads are normalized to the v2 content-anchor
-// shape (DESIGN.md §12) via a compat shim, so older comments keep working.
+// shape (see docs/intent/SPEC.md) via a compat shim, so older comments keep working.
 
 import { closeSync, existsSync, openSync, statSync, unlinkSync, writeSync } from "node:fs";
 import { mkdir, readdir, readFile, writeFile as fsWriteFile } from "node:fs/promises";
@@ -15,8 +15,15 @@ export class Store {
   private reviewsDir(): string {
     return join(this.root, ".reviews");
   }
+  // The project's intent doc. Prefer docs/intent/SPEC.md (the convention), fall back to
+  // a legacy root INTENT.md, and default to the former when neither exists yet.
+  private static INTENT_CANDIDATES = ["docs/intent/SPEC.md", "INTENT.md"];
+  intentRelPath(): string {
+    for (const rel of Store.INTENT_CANDIDATES) if (existsSync(join(this.root, rel))) return rel;
+    return Store.INTENT_CANDIDATES[0];
+  }
   private intentPath(): string {
-    return join(this.root, "INTENT.md");
+    return join(this.root, this.intentRelPath());
   }
   private fileFor(id: string): string {
     if (!/^[A-Za-z0-9_-]+$/.test(id)) throw new Error(`invalid thread id: ${id}`);
@@ -26,13 +33,16 @@ export class Store {
   // Intent ------------------------------------------------------------------
 
   async readIntent(): Promise<IntentPayload> {
-    const path = this.intentPath();
-    if (!existsSync(path)) return { content: "", exists: false, path: "INTENT.md" };
-    return { content: await readFile(path, "utf8"), exists: true, path: "INTENT.md" };
+    const path = this.intentRelPath();
+    const full = join(this.root, path);
+    if (!existsSync(full)) return { content: "", exists: false, path };
+    return { content: await readFile(full, "utf8"), exists: true, path };
   }
 
   async writeIntent(content: string): Promise<void> {
-    await fsWriteFile(this.intentPath(), content, "utf8");
+    const full = this.intentPath();
+    await mkdir(dirname(full), { recursive: true });
+    await fsWriteFile(full, content, "utf8");
   }
 
   // Write an arbitrary repo file (write-through for the editor). Guards against

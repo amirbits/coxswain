@@ -1,6 +1,5 @@
 // Filesystem watcher over the working tree. Because truth is the filesystem, the
-// server sees everything an external agent does without driving it (DESIGN.md
-// §6). Events are debounced so a burst of writes repaints the UI once, and noisy
+// server sees everything an external agent does without driving it (see docs/intent/SPEC.md). Events are debounced so a burst of writes repaints the UI once, and noisy
 // internals (.git/objects, node_modules, build output) are filtered out so we
 // never thrash — but we DO watch .git/HEAD, .git/index, .git/refs so commits,
 // staging, and branch moves update the diff.

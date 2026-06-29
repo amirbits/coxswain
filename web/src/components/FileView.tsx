@@ -52,7 +52,7 @@ async function loadLanguage(path: string): Promise<Extension> {
   return [];
 }
 
-// The file as-is (DESIGN.md §12). Markdown renders formatted with select-to-
+// The file as-is (see docs/intent/SPEC.md). Markdown renders formatted with select-to-
 // comment (+ a raw/edit toggle); everything else is a CodeMirror code view that
 // is read-only by default (syntax highlighting) and editable on demand, with
 // write-through save. Click a gutter line (shift-click for a range) to comment;

@@ -1,5 +1,5 @@
 // Entry point. `cd <repo> && helm` resolves the repo root, finds an open port,
-// starts the server, and opens the browser (DESIGN.md §7, open question §10.4).
+// starts the server, and opens the browser (see docs/intent/SPEC.md).
 
 import { createServer as netServer } from "node:net";
 import { resolve } from "node:path";
@@ -9,7 +9,7 @@ import { repoRoot } from "./git";
 import { startServer } from "./server";
 
 // Subcommands (the agent CLI) are a fourth front door onto the function
-// registry; bare `helm` serves the UI (DESIGN.md §5, §11).
+// registry; bare `helm` serves the UI (see docs/intent/SPEC.md).
 const VERBS = new Set([
   "context", "status", "intent", "tree", "file", "diff", "comments", "show",
   "reply", "suggest", "apply", "dismiss", "resolve", "reopen", "comment", "help",

@@ -1,6 +1,6 @@
 // Decorate threads with drift state and their current location. A comment is
 // anchored to file content; we find that content in the current file to (a) place
-// the inline highlight and (b) decide "outdated" when it's gone (DESIGN.md §12).
+// the inline highlight and (b) decide "outdated" when it's gone (see docs/intent/SPEC.md).
 
 import { statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
@@ -47,8 +47,7 @@ export async function decorateThreads(threads: Thread[], root: string): Promise<
 
 // Find the anchored content in the current file → 1-based line range, or null.
 // Drift + locating are content-based; the anchor's line numbers are a hint used
-// only to disambiguate when the anchored text occurs more than once (DESIGN.md
-// §12). This matches applySuggestion's stance: a unique occurrence is exact, a
+// only to disambiguate when the anchored text occurs more than once (see docs/intent/SPEC.md). This matches applySuggestion's stance: a unique occurrence is exact, a
 // repeated one is resolved by proximity to the hint rather than silently picking
 // the first copy.
 export function locate(content: string, context: string | undefined, anchor: { startLine: number; endLine: number }): Located {

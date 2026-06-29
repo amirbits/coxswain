@@ -4,7 +4,7 @@ import { ThreadCard, type ThreadActions } from "./ThreadCard";
 const ORDER: Record<string, number> = { open: 0, outdated: 1, resolved: 2 };
 
 // The home for all review threads across views — the decision log as a
-// byproduct of working (DESIGN.md §1). Resolved threads are hidden by default
+// byproduct of working (see docs/intent/SPEC.md). Resolved threads are hidden by default
 // (they're archived, not erased) and revealed with the header toggle.
 export function ReviewPanel({
   threads,

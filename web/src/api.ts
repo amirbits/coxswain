@@ -63,11 +63,9 @@ export const fetchGitStatus = () => call<GitStatus>("gitStatus", {});
 export const fetchGitTopology = () => call<GitTopology>("gitTopology", {});
 export const gitFetch = (remote?: string) => call<GitStatus>("gitFetch", remote ? { remote } : {});
 
-// Write-through for the editor. INTENT.md goes through writeIntent; everything
-// else through writeFile. Write-through to the working tree.
+// Write-through for the editor: the intent doc is just another file under the tree.
 export async function editFile(path: string, content: string): Promise<void> {
-  const fn = path === "INTENT.md" ? "writeIntent" : "writeFile";
-  await call(fn, fn === "writeIntent" ? { content } : { path, content });
+  await call("writeFile", { path, content });
 }
 
 export function subscribe(onChange: () => void, onStatus?: (ok: boolean) => void): () => void {

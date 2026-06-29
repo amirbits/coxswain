@@ -1,5 +1,5 @@
 // The v1 capabilities, registered onto a Registry. Shared by the UI, the HTTP
-// API, and the CLI (DESIGN.md §5). Diff modes are normalized here.
+// API, and the CLI (see docs/intent/SPEC.md). Diff modes are normalized here.
 
 import { diffAll, gitFetch, gitStatus, gitTopology, status } from "./git";
 import { parseMode } from "./mode";
@@ -18,8 +18,8 @@ export function buildRegistry(deps: { root: string; store: Store }): Registry {
   reg.register("workspace", "Explorer tree + repo info + all threads", (a: any) => getWorkspace(root, store, asMode(a?.mode)));
   reg.register("file", "A file's current content + its per-mode diff", (a: any) => getFile(root, store, String(a.path), asMode(a?.mode)));
   reg.register("showDiff", "Whole-repo diff for a mode", (a: any) => diffAll(root, asMode(a?.mode)));
-  reg.register("getIntent", "Read INTENT.md", () => store.readIntent());
-  reg.register("writeIntent", "Write INTENT.md (write-through)", async (a: any) => {
+  reg.register("getIntent", "Read the intent doc", () => store.readIntent());
+  reg.register("writeIntent", "Write the intent doc (write-through)", async (a: any) => {
     await store.writeIntent(String(a.content ?? ""));
     return store.readIntent();
   });

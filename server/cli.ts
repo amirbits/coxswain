@@ -1,5 +1,5 @@
 // The agent-facing CLI: a front door onto the same function registry the UI and
-// HTTP API use (DESIGN.md §5, §11–12). `helm <verb>` is a one-shot call against
+// HTTP API use (see docs/intent/SPEC.md). `helm <verb>` is a one-shot call against
 // the working tree — no server required.
 
 import { resolve } from "node:path";
@@ -31,7 +31,7 @@ const HELP = `helm — agent + human CLI over the review surface
   helm                       serve the UI (default)
   helm context               repo + intent + changed files + open comments (one shot)
   helm status                branch, change count, comment counts
-  helm intent                print INTENT.md
+  helm intent                print the intent doc
   helm tree [--all]          file explorer: changed + commented files (--all = every file)
   helm file <path>           print a file's current content
   helm diff [path]           diff (whole repo, or one file)
@@ -92,7 +92,7 @@ export async function runCli(rawArgs: string[]): Promise<number> {
       }
       case "intent": {
         const i = await call<{ content: string; exists: boolean }>("getIntent", {});
-        emit(i.exists ? i.content.replace(/\n$/, "") : "(no INTENT.md yet)", i);
+        emit(i.exists ? i.content.replace(/\n$/, "") : "(no intent doc yet)", i);
         return 0;
       }
       case "tree": {
@@ -350,7 +350,7 @@ function fmtContext(ws: Workspace, intent: { content: string; exists: boolean })
   const modeLabel =
     ws.mode.kind === "working" ? "working tree" : ws.mode.kind === "branch" ? `${ws.mode.ref}...HEAD` : `${ws.mode.ref}..HEAD`;
   let o = `repo:   ${ws.repo.name}\nbranch: ${ws.repo.branch}${ws.repo.head ? ` @ ${ws.repo.head.slice(0, 7)}` : ""}\n`;
-  o += `\n── intent ──────────────────────────────\n${intent.exists ? intent.content.trim() : "(no INTENT.md yet)"}\n`;
+  o += `\n── intent ──────────────────────────────\n${intent.exists ? intent.content.trim() : "(no intent doc yet)"}\n`;
   o += `\n── changes (${modeLabel}) ─────────────────  ${changed.length} file(s)\n`;
   o += (changed.length ? changed.map((e) => ` ${e.status}  ${e.path}`).join("\n") : "  (none)") + "\n";
   o += `  → helm diff [path] for the diff\n`;

@@ -1,7 +1,7 @@
 // The HTTP server: a projector + write-through layer over git and the
 // filesystem. It exposes the function registry over /api/call, a composed
 // /api/state projection for the frontend, and an SSE stream for live updates.
-// It holds no authoritative state (DESIGN.md §2).
+// It holds no authoritative state (see docs/intent/SPEC.md).
 
 import { extname, join } from "node:path";
 import { getEmbedded, hasEmbedded } from "./assets";
@@ -33,7 +33,7 @@ export async function startServer(opts: ServerOptions) {
 
   const watcher = startWatcher(root, (paths) => sse.broadcast({ type: "change", paths }));
 
-  // The --base flag selects the PR-style branch diff at boot (DESIGN.md §12).
+  // The --base flag selects the PR-style branch diff at boot (see docs/intent/SPEC.md).
   const bootMode: DiffMode = opts.defaultBase
     ? parseMode({ kind: "branch", ref: opts.defaultBase })
     : { kind: "working" };
