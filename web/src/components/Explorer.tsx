@@ -2,10 +2,11 @@ import { useState } from "react";
 import type { TreeEntry } from "../types";
 
 // File explorer. A pinned "All changes" row opens the continuous changeset diff;
-// INTENT.md is pinned next. Files are decorated with their change status (in the
-// active mode) and a comment badge. Click a file to open it (DESIGN.md §12).
+// INTENT.md is pinned next. Folders collapse/expand; files and folders are shown
+// with distinct icons, and a collapsed folder that hides changes gets a dot so
+// you can still tell (DESIGN.md §12).
 
-type Node = { name: string; path: string; entry?: TreeEntry; children: Node[] };
+type Node = { name: string; path: string; entry?: TreeEntry; children: Node[]; dirty?: boolean };
 
 function buildTree(entries: TreeEntry[]): Node {
   const root: Node = { name: "", path: "", children: [] };
@@ -34,7 +35,44 @@ function buildTree(entries: TreeEntry[]): Node {
     n.children.forEach(sort);
   };
   sort(root);
+  // Propagate a "has changes somewhere below" flag so collapsed folders can hint.
+  const markDirty = (n: Node): boolean => {
+    const childDirty = n.children.map(markDirty).some(Boolean);
+    n.dirty = childDirty || !!n.entry?.status;
+    return n.dirty;
+  };
+  markDirty(root);
   return root;
+}
+
+// --- icons (currentColor, so they follow the theme) ------------------------
+
+function Chevron({ open }: { open: boolean }) {
+  return (
+    <svg className={`caret-ic${open ? " open" : ""}`} viewBox="0 0 24 24" width="10" height="10" aria-hidden="true">
+      <path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function FolderIcon({ open }: { open: boolean }) {
+  return (
+    <svg className={`ftype-ic folder${open ? " open" : ""}`} viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+      <path
+        d="M3 6.5C3 5.7 3.7 5 4.5 5h4.2c.4 0 .77.17 1.04.46L11 7h8.5c.83 0 1.5.67 1.5 1.5v9c0 .83-.67 1.5-1.5 1.5h-15C3.67 19 3 18.33 3 17.5v-11z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+function FileIcon() {
+  return (
+    <svg className="ftype-ic file" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+      <path d="M13 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V9z" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+      <path d="M13 3v6h6" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+    </svg>
+  );
 }
 
 export function Explorer({
@@ -108,14 +146,18 @@ function TreeNode({
   if (!isFolder && node.entry) {
     return <FileRow entry={node.entry} depth={depth} selected={activeKey === node.path} onSelect={onSelect} />;
   }
-  const isCollapsed = collapsed.has(node.path);
+  const open = !collapsed.has(node.path);
   return (
     <>
-      <div className="row folder" style={{ paddingLeft: 8 + depth * 12 }} onClick={() => toggle(node.path)}>
-        <span className="caret">{isCollapsed ? "▸" : "▾"}</span>
+      <div className="row folder" style={{ paddingLeft: 8 + depth * 12 }} onClick={() => toggle(node.path)} title={node.path}>
+        <span className="twiggle">
+          <Chevron open={open} />
+        </span>
+        <FolderIcon open={open} />
         <span className="name">{node.name}</span>
+        {!open && node.dirty && <span className="dot" title="changes inside" />}
       </div>
-      {!isCollapsed &&
+      {open &&
         node.children.map((c) => (
           <TreeNode key={c.path} node={c} depth={depth + 1} collapsed={collapsed} toggle={toggle} activeKey={activeKey} onSelect={onSelect} />
         ))}
@@ -138,17 +180,14 @@ function FileRow({
 }) {
   const comments = entry.open + entry.outdated;
   return (
-    <div
-      className={`row file${selected ? " selected" : ""}`}
-      style={{ paddingLeft: 8 + depth * 12 + (pinned ? 0 : 14) }}
-      onClick={() => onSelect(entry.path)}
-      title={entry.path}
-    >
-      {entry.status && <span className={`gstatus ${entry.status}`}>{entry.status}</span>}
+    <div className={`row file${selected ? " selected" : ""}`} style={{ paddingLeft: 8 + depth * 12 }} onClick={() => onSelect(entry.path)} title={entry.path}>
+      <span className="twiggle" />
+      <FileIcon />
       <span className="name">
         {pinned ? "⚑ " : ""}
         {entry.path.split("/").pop()}
       </span>
+      {entry.status && <span className={`gstatus ${entry.status}`}>{entry.status}</span>}
       {comments > 0 && (
         <span className={`cbadge${entry.outdated ? " has-outdated" : ""}`} title={`${entry.open} open, ${entry.outdated} outdated`}>
           {comments}

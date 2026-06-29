@@ -1006,8 +1006,8 @@ code {
 .row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 2px 10px;
+  gap: 5px;
+  padding: 3px 10px;
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
@@ -1017,6 +1017,7 @@ code {
 }
 .row.file.selected {
   background: var(--accent-soft);
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 .row .name {
   overflow: hidden;
@@ -1024,13 +1025,48 @@ code {
   flex: 1;
 }
 .row.folder {
-  color: var(--muted);
+  color: var(--ink);
   font-weight: 600;
 }
 .caret {
   width: 12px;
   color: var(--faint);
   font-size: 10px;
+}
+.twiggle {
+  width: 12px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--faint);
+}
+.caret-ic {
+  transition: transform 0.12s ease;
+}
+.caret-ic.open {
+  transform: rotate(90deg);
+}
+.ftype-ic {
+  flex: none;
+}
+.ftype-ic.folder {
+  color: var(--accent);
+  opacity: 0.9;
+}
+.ftype-ic.file {
+  color: var(--faint);
+}
+.row.file.selected .ftype-ic.file {
+  color: var(--accent);
+  opacity: 1;
+}
+.row.folder .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  flex: none;
 }
 .gstatus {
   font-family: var(--mono);
