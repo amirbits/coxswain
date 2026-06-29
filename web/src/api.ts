@@ -2,7 +2,7 @@
 // GET /api/file (one file's content + diff), POST /api/call (the registry), and
 // the /events SSE stream. Every change just re-projects.
 
-import type { DiffMode, FilePayload, Workspace } from "./types";
+import type { DiffMode, FilePayload, GitStatus, GitTopology, Workspace } from "./types";
 
 export type BootPayload = { mode: DiffMode; root: string };
 export type RegistrySpec = { name: string; description: string };
@@ -57,6 +57,11 @@ export async function call<T = unknown>(name: string, args: unknown): Promise<T>
   if (!res.ok || !data.ok) throw new Error(data.error || `call ${name} failed`);
   return data.result as T;
 }
+
+// Source control (Slice A): orientation + the one safe action (fetch).
+export const fetchGitStatus = () => call<GitStatus>("gitStatus", {});
+export const fetchGitTopology = () => call<GitTopology>("gitTopology", {});
+export const gitFetch = (remote?: string) => call<GitStatus>("gitFetch", remote ? { remote } : {});
 
 // Write-through for the editor. INTENT.md goes through writeIntent; everything
 // else through writeFile. Write-through to the working tree.

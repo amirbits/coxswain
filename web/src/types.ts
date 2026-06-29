@@ -27,7 +27,7 @@ export type DecoratedThread = {
 export type FileKind = "markdown" | "text" | "binary";
 export type ChangeStatus = "A" | "M" | "D" | "R" | "C" | null;
 
-export type DiffMode = { kind: "working" | "branch" | "ref"; ref?: string | null };
+export type DiffMode = { kind: "working" | "staged" | "branch" | "ref"; ref?: string | null };
 
 export type TreeEntry = { path: string; status: ChangeStatus; open: number; outdated: number };
 
@@ -36,7 +36,10 @@ export type RepoInfo = {
   name: string;
   branch: string;
   head: string | null;
-  refs: { branches: string[]; tags: string[] };
+  upstream: string | null;
+  ahead: number;
+  behind: number;
+  refs: { branches: string[]; tags: string[]; remoteBranches: string[] };
 };
 
 export type Workspace = {
@@ -57,3 +60,28 @@ export type FilePayload = {
 
 // What a view hands up when the human leaves a comment.
 export type NewComment = { path: string; startLine: number; endLine: number; content: string };
+
+// Source-control panel (Slice A).
+export type RepoStatusFile = { path: string; index: string; worktree: string };
+export type GitStatus = {
+  branch: string;
+  head: string | null;
+  upstream: string | null;
+  ahead: number;
+  behind: number;
+  staged: RepoStatusFile[];
+  unstaged: RepoStatusFile[];
+  untracked: RepoStatusFile[];
+  stashCount: number;
+};
+export type Worktree = {
+  path: string;
+  head: string | null;
+  branch: string | null;
+  current: boolean;
+  detached: boolean;
+  bare: boolean;
+  locked: boolean;
+};
+export type Remote = { name: string; fetchUrl: string | null };
+export type GitTopology = { worktrees: Worktree[]; remotes: Remote[]; remoteBranches: string[] };

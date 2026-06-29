@@ -26,7 +26,7 @@ export function ChangesView({ raw, mode, ...shared }: Shared & { raw: string; mo
     }
   }, [raw]);
 
-  const label = mode.kind === "working" ? "working tree" : mode.kind === "branch" ? `${mode.ref}…HEAD` : `${mode.ref}..HEAD`;
+  const label = mode.kind === "working" ? "working tree" : mode.kind === "staged" ? "staged (index)" : mode.kind === "branch" ? `${mode.ref}…HEAD` : `${mode.ref}..HEAD`;
 
   if (files.length === 0) {
     return (
