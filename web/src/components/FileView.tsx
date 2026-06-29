@@ -5,7 +5,7 @@ import remarkGfm from "remark-gfm";
 import { Compartment, EditorState, Range, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetType, keymap, lineNumbers } from "@codemirror/view";
 import { defaultKeymap, historyKeymap } from "@codemirror/commands";
-import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import { HighlightStyle, StreamLanguage, syntaxHighlighting } from "@codemirror/language";
 import { tags } from "@lezer/highlight";
 import type { Extension } from "@codemirror/state";
 import type { DecoratedThread, FilePayload, NewComment } from "../types";
@@ -41,6 +41,11 @@ async function loadLanguage(path: string): Promise<Extension> {
     if (/\.json$/i.test(path)) return (await import("@codemirror/lang-json")).json();
     if (/\.py$/i.test(path)) return (await import("@codemirror/lang-python")).python();
     if (/\.html?$/i.test(path)) return (await import("@codemirror/lang-html")).html();
+    if (/\.rs$/i.test(path)) return (await import("@codemirror/lang-rust")).rust();
+    if (/\.(c|h|cc|cpp|cxx|hpp|hh|hxx)$/i.test(path)) return (await import("@codemirror/lang-cpp")).cpp();
+    if (/\.(sh|bash|zsh|ksh)$/i.test(path) || /(^|\/)\.(bashrc|bash_profile|zshrc|zprofile|zshenv|profile)$/i.test(path)) {
+      return StreamLanguage.define((await import("@codemirror/legacy-modes/mode/shell")).shell);
+    }
   } catch {
     // grammar failed to load → no highlighting, still usable
   }
