@@ -1058,6 +1058,22 @@ code {
   overflow-x: auto;
   flex: 1;
   min-width: 0;
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: var(--line-strong) transparent;
+}
+/* Slim the horizontal tab scrollbar so it doesn't crowd the tab labels. */
+.tabbar::-webkit-scrollbar {
+  height: 6px;
+}
+.tabbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.tabbar::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 3px;
+}
+.tabbar::-webkit-scrollbar-thumb:hover {
+  background: var(--faint);
 }
 .tab {
   display: flex;
