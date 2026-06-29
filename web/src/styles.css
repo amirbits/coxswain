@@ -995,6 +995,9 @@ code {
 }
 .diff-body {
   padding: 6px 0 48px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
 /* Tabs + main header --------------------------------------------------- */
@@ -1011,6 +1014,15 @@ code {
   background: var(--glass);
   backdrop-filter: blur(6px);
   border-bottom: 1px solid var(--line);
+  flex: none;
+}
+/* The scroll child of .main-col (which is overflow:hidden) — replaces the old
+   .view wrapper, so content (code / markdown / diff / changes) scrolls. */
+.main-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 .tabbar {
   display: flex;
@@ -1072,6 +1084,9 @@ code {
 
 .changes-view {
   padding-bottom: 48px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 .changes-head {
   padding: 10px 16px;
