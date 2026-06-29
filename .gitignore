@@ -16,3 +16,6 @@ server/assets.generated.ts
 
 # local, machine-specific Claude Code settings
 .claude/settings.local.json
+
+# Helm review threads — kept local, not shared via git
+.reviews/
