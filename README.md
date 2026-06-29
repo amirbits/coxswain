@@ -3,18 +3,27 @@
 A local-first command-and-control workspace for agentic software work.
 
 `cd` into any git repo, run one binary, and Helm serves a localhost web UI that
-projects the project through reviewable **views** — its intent and its diff — all
-backed by a single source of truth: the git working tree.
+projects the project through reviewable **views** — its files, their diffs, its
+git/source-control state, and an embedded terminal — all backed by a single source
+of truth: the git working tree.
 
 See [`INTENT.md`](./INTENT.md) for what Helm is, and [`DESIGN.md`](./DESIGN.md) /
 [`IMPLEMENTATION_BRIEF.md`](./IMPLEMENTATION_BRIEF.md) for the why and the build order.
 
-## Status — Phase 1 (WATCH)
+## Status
 
-Helm watches the filesystem + git and renders live. You run your own Claude Code;
-you steer it by leaving review comments that persist as files under `.reviews/`;
-the agent reads them, edits files, and the UI repaints live. The point is that the work
-is **reviewable before you accept it** — accepting is a commit / merge.
+Helm watches the filesystem + git and renders live. Steer your agent by leaving review
+comments that persist as files under `.reviews/` (gitignore-able, so they stay local);
+the agent reads them, edits files, and the UI repaints with no refresh. Run Claude Code
+in your own terminal **or** in Helm's embedded terminal. The point is that the work is
+**reviewable before you accept it** — accepting is a commit / merge.
+
+Built so far: the file **explorer** + **file view** (syntax-highlighted) + **diff view**
+(per-file and a continuous "All changes" view, with word-level highlighting) in four
+modes — working / staged / vs-branch / vs-commit; a **Source Control** rail (branch,
+ahead/behind vs origin, fetch, staged/unstaged/untracked, stashes, worktrees, remotes);
+the **Review** panel; a command palette (⌘K); and an **embedded terminal** (real PTY,
+multiple tabs) — all opened as tabs.
 
 ## Quick start
 
@@ -33,9 +42,13 @@ bun run dev                # Vite (UI, :5173) + Bun API server (:4317)
 Flags (`helm --help`): `--port <n>`, `--base <ref>` (PR-style `base...HEAD` diff),
 `--dir <path>`, `--no-open`.
 
+**Requires** to *run*: `git` on your `PATH`, **macOS or Linux** (the embedded terminal
+uses a POSIX pty), and a browser. The compiled binary bundles everything else — no
+Bun/Node needed to run it (only to build it).
+
 ## The loop
 
-1. Run `helm` inside a git repo. Edit `INTENT.md` (the **Intent** view) to capture intent.
+1. Run `helm` inside a git repo. Open `INTENT.md` (pinned in the explorer) to capture intent.
 2. Make changes — or let your agent make them; watch the **Diff** view update live.
 3. Select diff lines (click a line number, shift-click for a range) or intent text →
    leave a comment. It is saved as a file under `.reviews/`.
@@ -85,20 +98,19 @@ filesystem. Each thread is one file:
 // .reviews/<uuid>.json
 {
   "id": "<uuid>",
-  "anchor": {
-    "view": "diff",                 // or "intent"
-    "version": "working",           // sha the comment was made against, or "working"
-    "locator": { "kind": "lines", "path": "src/x.ts", "side": "new",
-                 "startLine": 40, "endLine": 44 }
-  },
+  "anchor": { "path": "src/x.ts", "startLine": 40, "endLine": 44 },
   "status": "open",                 // open | resolved  ("outdated" is derived, not stored)
-  "context": "…captured anchored text…",
+  "context": "…the exact anchored text…",   // how the thread re-locates itself across edits
   "thread": [
     { "author": "human", "body": "Why fetch inside the loop?", "ts": "…" },
     { "author": "agent", "body": "Refactored to batch.", "ts": "…" }
   ]
 }
 ```
+
+A comment anchors to **file content** (`path` + line hints + the captured `context`),
+not to diff coordinates — so one thread renders in every lens (file view, any diff mode,
+the Review panel) and goes **outdated** when its `context` can no longer be found.
 
 To wire your agent, tell it:
 
@@ -113,14 +125,15 @@ browser re-projects state live.
 ## Architecture (v1)
 
 - **Server** (`server/`, Bun + TS): a pure projector + write-through layer over git
-  and the filesystem — no authoritative state of its own. `GET /api/state` composes
-  the whole projection; `POST /api/call` dispatches the function registry; `/events`
-  is the SSE change stream.
-- **Web** (`web/`, React + Vite + TS): a file explorer, the file view and per-file
-  diff view (both Reviewable, with working / branch / commit diff modes), plus the
-  Review panel.
+  and the filesystem — no authoritative state of its own. `GET /api/workspace`,
+  `/api/file`, `/api/changes` compose the projections; `POST /api/call` dispatches the
+  function registry; `/events` is the SSE change stream; `/terminal` is the PTY
+  WebSocket.
+- **Web** (`web/`, React + Vite + TS): the file explorer, the file view and per-file +
+  continuous diff views (Reviewable, in working / staged / vs-branch / vs-commit modes),
+  the Source Control rail, the Review panel, and an embedded terminal — opened as tabs.
 - **Single binary**: `bun run build` bakes the web app into the executable, so `helm`
-  runs from any folder with nothing else on disk.
+  runs from any folder with nothing else on disk (just `git`).
 
 ## Invariants
 

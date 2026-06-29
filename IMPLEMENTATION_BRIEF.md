@@ -3,6 +3,14 @@
 > Hand this to Claude Code. It is the *what and in what order*. The companion
 > `DESIGN.md` is the *how and why*. Read both before writing code.
 
+> **Status — kept as the founding brief.** This describes v1 and its phasing *as
+> planned*. Much of what it lists as later / "OUT of v1" has since shipped: the
+> code-file view, the **embedded terminal**, a command palette, and a read-only **git
+> source-control** surface (status, ahead/behind, fetch, staged diff). For the current
+> state see `README.md`; for the up-to-date design see `DESIGN.md` (§12–§13). The
+> invariants (§2, §7) still hold — with the acceptance one reframed to *review before
+> acceptance, not restricting who commits*.
+
 ---
 
 ## 1. One-paragraph pitch
@@ -45,7 +53,8 @@ accepted — and acceptance is just `git commit` / push / merge.
    Code in your own terminal. Driving CC (embedded terminal, pty) is Phase 2,
    built only after the watch loop proves sticky. This removes the single
    riskiest, most time-consuming piece of plumbing from the validation build.
-   See `DESIGN.md §6`.
+   See `DESIGN.md §6`. *(Update: it proved sticky — the embedded terminal has since
+   shipped, as a real PTY in a tab; you can run Claude Code inside Helm.)*
 
 ## 3. Stack
 
@@ -82,11 +91,12 @@ accepted — and acceptance is just `git commit` / push / merge.
   optionally appends replies; the UI reflects changes live.
 
 **Explicitly OUT of v1 (already designed for, build later):**
-- Driving / embedding Claude Code (terminal emulator, pty) — Phase 2.
-- Multi-workspace management (`git worktree` orchestration) — Phase 2.
+- Driving / embedding Claude Code (terminal emulator, pty) — Phase 2. **[shipped]**
+- Multi-workspace management (`git worktree` orchestration) — Phase 2. *(worktrees are
+  now listed read-only; switching / creating them is still deferred)*
 - Git graph / log visualization (plain `git log` text is enough if needed).
-- Most of the command palette (only the handful of verbs you need).
-- Code-file view (fast-follow after Intent + Diff prove out).
+- Most of the command palette (only the handful of verbs you need). **[shipped — ⌘K]**
+- Code-file view (fast-follow after Intent + Diff prove out). **[shipped]**
 
 ## 5. Build order
 

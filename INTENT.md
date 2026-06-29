@@ -7,8 +7,9 @@
 
 A local-first **command-and-control workspace for agentic software work**. You `cd`
 into any git repo, run one binary, and Helm serves a localhost web UI that shows the
-project through several **views** — its intent (this file), its files, and its diff — all
-projected from one source of truth: the git working tree itself.
+project through several **views** — its intent (this file), its files, their diffs, its
+git/source-control state, and an embedded terminal — all projected from one source of
+truth: the git working tree itself.
 
 Every view is **reviewable**: you can comment on a region like in a Google Doc or a PR
 review, and an agent can read those comments, reply, and revise the files. Review
@@ -34,21 +35,26 @@ one truth, with review and the decision log as a **byproduct** of working.
 - All steering flows through this surface (comments-as-files the agent reads), never
   through side channels the views cannot observe.
 
-## Scope right now (Phase 1 — WATCH)
+## Scope right now
 
-Helm **watches** the filesystem and git and renders live. It does **not** drive your
-agent yet. You run Claude Code yourself; you steer it by leaving review comments; the
-agent reads `.reviews/`, edits files, and the UI repaints live.
+Helm **watches** the filesystem and git and renders live — the agent edits files (in
+its own terminal, or Helm's embedded one) and the UI repaints with no refresh. You
+steer by leaving review comments; the agent reads `.reviews/`, edits files, replies.
 
-- **Explorer + file view** — browse the project and read any file as-is (this one
-  rendered as markdown). Reviewable.
-- **Diff view** — the selected file's diff in three modes: the working tree
-  (uncommitted), vs a branch (merge-request style), or vs a commit/tag. Reviewable.
+- **Explorer + file view** — browse the project and read any file as-is (markdown
+  rendered; code syntax-highlighted). Reviewable.
+- **Diff view** — the selected file's diff, or a continuous "All changes" view, in four
+  modes: working tree, staged (index), vs a branch (merge-request style), or vs a
+  commit/tag — with word-level highlighting. Reviewable.
+- **Source control** — branch, ahead/behind vs origin, fetch, the working tree grouped
+  staged/unstaged/untracked, stashes, worktrees, remotes.
 - **Comments** — select a region in any view; the thread persists as a file under
   `.reviews/` and rides the file's content across every lens.
+- **Terminal** — a real shell (or your agent) embedded as a tab, rooted at the repo.
+- **Command palette** (⌘K) over the function registry.
 
-Driving the agent, multi-workspace `git worktree` orchestration, and a command palette
-are designed but deliberately deferred.
+Still deferred: mutating git from the UI (stage / commit / stash / switch — they need
+guardrails) and multi-workspace `git worktree` orchestration.
 
 ## Agents steer through the surface, not around it
 
