@@ -4,15 +4,14 @@
 // (DESIGN.md §2, §12).
 
 import { basename } from "node:path";
-import { changedFiles, currentBranch, diffFile, fileStatus, headSha, listFiles, listRefs, readFileContent } from "./git";
+import { changedFiles, diffFile, fileStatus, listFiles, listRefs, readFileContent, status } from "./git";
 import { decorateThreads } from "./review";
 import type { Store } from "./store";
 import type { DiffMode, FilePayload, TreeEntry, Workspace } from "./types";
 
 export async function getWorkspace(root: string, store: Store, mode: DiffMode): Promise<Workspace> {
-  const [branch, head, files, refs, changed, rawThreads] = await Promise.all([
-    currentBranch(root),
-    headSha(root),
+  const [st, files, refs, changed, rawThreads] = await Promise.all([
+    status(root),
     listFiles(root),
     listRefs(root),
     changedFiles(root, mode),
@@ -37,7 +36,7 @@ export async function getWorkspace(root: string, store: Store, mode: DiffMode): 
   }));
 
   return {
-    repo: { root, name: basename(root), branch, head, refs },
+    repo: { root, name: basename(root), branch: st.branch, head: st.head, upstream: st.upstream, ahead: st.ahead, behind: st.behind, refs },
     mode,
     tree,
     threads,

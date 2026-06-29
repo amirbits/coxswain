@@ -9,8 +9,12 @@ import type {
   DiffMode,
   DiffPayload,
   FileKind,
+  GitStatus,
+  GitTopology,
+  Remote,
   RepoStatus,
   RepoStatusFile,
+  Worktree,
 } from "./types";
 
 type GitResult = { ok: boolean; stdout: string; stderr: string; code: number };
@@ -55,30 +59,131 @@ export async function status(root: string): Promise<RepoStatus> {
   const [branch, head] = await Promise.all([currentBranch(root), headSha(root)]);
   const r = await git(root, ["status", "--porcelain=v1", "-b", "--untracked-files=all"]);
   const files: RepoStatusFile[] = [];
+  let upstream: string | null = null;
   let ahead = 0;
   let behind = 0;
   for (const line of r.stdout.split("\n")) {
     if (!line) continue;
     if (line.startsWith("## ")) {
-      const m = line.match(/\[ahead (\d+)(?:, behind (\d+))?\]|\[behind (\d+)\]/);
-      if (m) {
-        ahead = parseInt(m[1] ?? "0", 10) || 0;
-        behind = parseInt(m[2] ?? m[3] ?? "0", 10) || 0;
-      }
+      // "## main...origin/main [ahead 2, behind 1]" — upstream + tracking counts.
+      const refs = line.slice(3).split(" ")[0]; // "main...origin/main" or "HEAD"
+      const dots = refs.indexOf("...");
+      if (dots >= 0) upstream = refs.slice(dots + 3) || null;
+      ahead = parseInt(line.match(/ahead (\d+)/)?.[1] ?? "0", 10) || 0;
+      behind = parseInt(line.match(/behind (\d+)/)?.[1] ?? "0", 10) || 0;
       continue;
     }
     files.push({ index: line[0], worktree: line[1], path: line.slice(3) });
   }
-  return { branch, head, ahead, behind, files };
+  return { branch, head, upstream, ahead, behind, files };
 }
 
-export async function listRefs(root: string): Promise<{ branches: string[]; tags: string[] }> {
-  const [b, t] = await Promise.all([
+export async function listRefs(root: string): Promise<{ branches: string[]; tags: string[]; remoteBranches: string[] }> {
+  const [b, t, rb] = await Promise.all([
     git(root, ["branch", "--format=%(refname:short)"]),
     git(root, ["tag", "--list", "--sort=-creatordate"]),
+    git(root, ["branch", "-r", "--format=%(refname:short)"]),
   ]);
   const lines = (s: string) => s.split("\n").map((x) => x.trim()).filter(Boolean);
-  return { branches: lines(b.stdout), tags: lines(t.stdout) };
+  return {
+    branches: lines(b.stdout),
+    tags: lines(t.stdout),
+    remoteBranches: lines(rb.stdout).filter((x) => !x.endsWith("/HEAD")),
+  };
+}
+
+// --- Source control (Slice A): read-only status/topology + the one safe action.
+
+export async function stashCount(root: string): Promise<number> {
+  const r = await git(root, ["stash", "list"]);
+  return r.ok ? r.stdout.split("\n").filter(Boolean).length : 0;
+}
+
+// Working-tree status grouped into staged / unstaged / untracked (a file can be
+// in both staged and unstaged). .reviews/ is excluded — review truth, not repo
+// content.
+export async function gitStatus(root: string): Promise<GitStatus> {
+  const [st, stashes] = await Promise.all([status(root), stashCount(root)]);
+  const staged: RepoStatusFile[] = [];
+  const unstaged: RepoStatusFile[] = [];
+  const untracked: RepoStatusFile[] = [];
+  for (const f of st.files) {
+    if (!keepPath(f.path)) continue;
+    if (f.index === "?" && f.worktree === "?") {
+      untracked.push(f);
+      continue;
+    }
+    if (f.index !== " ") staged.push(f);
+    if (f.worktree !== " ") unstaged.push(f);
+  }
+  return { branch: st.branch, head: st.head, upstream: st.upstream, ahead: st.ahead, behind: st.behind, staged, unstaged, untracked, stashCount: stashes };
+}
+
+export async function listWorktrees(root: string): Promise<Worktree[]> {
+  const r = await git(root, ["worktree", "list", "--porcelain"]);
+  if (!r.ok) return [];
+  const here = resolve(root);
+  const out: Worktree[] = [];
+  let cur: (Partial<Worktree> & { path?: string }) | null = null;
+  const flush = () => {
+    if (!cur?.path) return;
+    out.push({
+      path: cur.path,
+      head: cur.head ?? null,
+      branch: cur.branch ?? null,
+      detached: !!cur.detached,
+      bare: !!cur.bare,
+      locked: !!cur.locked,
+      current: resolve(cur.path) === here,
+    });
+  };
+  for (const line of r.stdout.split("\n")) {
+    if (line.startsWith("worktree ")) {
+      flush();
+      cur = { path: line.slice("worktree ".length) };
+    } else if (!cur) {
+      continue;
+    } else if (line.startsWith("HEAD ")) {
+      cur.head = line.slice("HEAD ".length);
+    } else if (line.startsWith("branch ")) {
+      cur.branch = line.slice("branch ".length).replace("refs/heads/", "");
+    } else if (line === "detached") {
+      cur.detached = true;
+    } else if (line === "bare") {
+      cur.bare = true;
+    } else if (line.startsWith("locked")) {
+      cur.locked = true;
+    }
+  }
+  flush();
+  return out;
+}
+
+export async function listRemotes(root: string): Promise<Remote[]> {
+  const r = await git(root, ["remote", "-v"]);
+  if (!r.ok) return [];
+  const seen = new Map<string, string | null>();
+  for (const line of r.stdout.split("\n")) {
+    if (!line.endsWith("(fetch)")) continue;
+    const [name, rest] = line.split("\t");
+    if (name && !seen.has(name)) seen.set(name, (rest ?? "").replace(/ \(fetch\)$/, "") || null);
+  }
+  return [...seen].map(([name, fetchUrl]) => ({ name, fetchUrl }));
+}
+
+export async function gitTopology(root: string): Promise<GitTopology> {
+  const [worktrees, remotes, refs] = await Promise.all([listWorktrees(root), listRemotes(root), listRefs(root)]);
+  return { worktrees, remotes, remoteBranches: refs.remoteBranches };
+}
+
+// The one mutating op in Slice A — and it's safe: fetch only updates
+// remote-tracking refs, never the working tree or your local branches.
+export async function gitFetch(root: string, remote?: string | null): Promise<GitStatus> {
+  const args = ["fetch", "--prune"];
+  if (remote) args.push(remote);
+  const r = await git(root, args);
+  if (!r.ok) throw new Error(r.stderr.trim() || "git fetch failed");
+  return gitStatus(root);
 }
 
 // Tracked + untracked (non-ignored) files, minus .reviews/.
@@ -99,6 +204,7 @@ function keepPath(f: string): boolean {
 
 // The git range args for a mode (target is HEAD/working; see DiffMode).
 function rangeArgs(mode: DiffMode, head: string | null): string[] {
+  if (mode.kind === "staged") return ["--cached"]; // index vs HEAD
   if (mode.kind === "working" || !mode.ref) return head ? ["HEAD"] : ["--cached"];
   if (mode.kind === "branch") return [`${mode.ref}...HEAD`]; // merge-base (MR style)
   return [`${mode.ref}..HEAD`]; // vs a commit / tag

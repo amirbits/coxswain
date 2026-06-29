@@ -49,11 +49,12 @@ export type DecoratedThread = Thread & {
 export type FileKind = "markdown" | "text" | "binary";
 export type ChangeStatus = "A" | "M" | "D" | "R" | "C" | null;
 
-// A diff is diff(base → target). The three submodes are presets:
+// A diff is diff(base → target). The submodes are presets:
 //  working → HEAD vs working tree (uncommitted, incl. untracked)
+//  staged  → HEAD vs index (git diff --cached: what a commit would record)
 //  branch  → merge-base(ref, HEAD)…HEAD  (merge-request style, three-dot)
 //  ref     → ref..HEAD                    (vs a commit or tag, two-dot)
-export type DiffMode = { kind: "working" | "branch" | "ref"; ref?: string | null };
+export type DiffMode = { kind: "working" | "staged" | "branch" | "ref"; ref?: string | null };
 
 export type TreeEntry = {
   path: string;
@@ -67,7 +68,10 @@ export type RepoInfo = {
   name: string;
   branch: string;
   head: string | null;
-  refs: { branches: string[]; tags: string[] };
+  upstream: string | null; // tracking branch, e.g. "origin/main"
+  ahead: number;
+  behind: number;
+  refs: { branches: string[]; tags: string[]; remoteBranches: string[] };
 };
 
 export type Workspace = {
@@ -93,7 +97,40 @@ export type RepoStatusFile = { path: string; index: string; worktree: string };
 export type RepoStatus = {
   branch: string;
   head: string | null;
+  upstream: string | null;
   ahead: number;
   behind: number;
   files: RepoStatusFile[];
+};
+
+// Source-control panel (Slice A): working-tree status grouped for display, plus
+// the repo's worktrees / remotes / remote branches (its topology). All read-only.
+export type GitStatus = {
+  branch: string;
+  head: string | null;
+  upstream: string | null;
+  ahead: number;
+  behind: number;
+  staged: RepoStatusFile[];
+  unstaged: RepoStatusFile[];
+  untracked: RepoStatusFile[];
+  stashCount: number;
+};
+
+export type Worktree = {
+  path: string;
+  head: string | null;
+  branch: string | null;
+  current: boolean;
+  detached: boolean;
+  bare: boolean;
+  locked: boolean;
+};
+
+export type Remote = { name: string; fetchUrl: string | null };
+
+export type GitTopology = {
+  worktrees: Worktree[];
+  remotes: Remote[];
+  remoteBranches: string[];
 };

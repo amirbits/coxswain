@@ -1,7 +1,7 @@
 // The v1 capabilities, registered onto a Registry. Shared by the UI, the HTTP
 // API, and the CLI (DESIGN.md §5). Diff modes are normalized here.
 
-import { diffAll, status } from "./git";
+import { diffAll, gitFetch, gitStatus, gitTopology, status } from "./git";
 import { parseMode } from "./mode";
 import { Registry } from "./registry";
 import { decorateThreads } from "./review";
@@ -69,6 +69,13 @@ export function buildRegistry(deps: { root: string; store: Store }): Registry {
       },
     };
   });
+
+  // Source control (Slice A) — read-only orientation + the one safe action.
+  reg.register("gitStatus", "Working-tree status grouped (staged/unstaged/untracked) + ahead/behind + stash count", () => gitStatus(root));
+  reg.register("gitTopology", "Worktrees, remotes, and remote branches", () => gitTopology(root));
+  reg.register("gitFetch", "Fetch + prune remote-tracking refs (safe; never touches the working tree)", (a: any) =>
+    gitFetch(root, a?.remote ? String(a.remote) : null),
+  );
 
   return reg;
 }
