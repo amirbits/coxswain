@@ -17,6 +17,8 @@ export default defineConfig({
       "/api": { target: "http://127.0.0.1:4317", changeOrigin: true },
       // SSE: http-proxy streams responses through without buffering.
       "/events": { target: "http://127.0.0.1:4317", changeOrigin: true },
+      // Embedded terminal WebSocket → Bun PTY.
+      "/terminal": { target: "ws://127.0.0.1:4317", ws: true },
     },
   },
   build: {

@@ -1023,6 +1023,25 @@ code {
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  position: relative;
+}
+
+/* Embedded terminal ---------------------------------------------------- */
+.terminal-pane {
+  position: absolute;
+  inset: 0;
+  background: #ffffff;
+  padding: 6px 4px 6px 10px;
+  overflow: hidden;
+}
+[data-theme="dark"] .terminal-pane {
+  background: #16161c;
+}
+.terminal-pane.hidden {
+  display: none;
+}
+.terminal-pane .xterm {
+  height: 100%;
 }
 .tabbar {
   display: flex;

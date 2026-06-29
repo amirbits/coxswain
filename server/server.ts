@@ -10,6 +10,7 @@ import { parseMode } from "./mode";
 import { SSEHub } from "./sse";
 import { diffAll } from "./git";
 import { Store } from "./store";
+import { closeTerminal, openTerminal, terminalMessage, type TermData } from "./terminal";
 import type { DiffMode } from "./types";
 import { startWatcher } from "./watcher";
 import { getFile, getWorkspace } from "./workspace";
@@ -41,11 +42,27 @@ export async function startServer(opts: ServerOptions) {
     port: opts.port,
     hostname: "127.0.0.1",
     idleTimeout: 255, // SSE heartbeat (25s) keeps streams alive well within this
-    async fetch(req) {
+    websocket: {
+      idleTimeout: 960,
+      open: openTerminal,
+      message: terminalMessage,
+      close: closeTerminal,
+    },
+    async fetch(req, server) {
       const url = new URL(req.url);
       const { pathname } = url;
 
       if (pathname === "/events") return sse.handler();
+
+      if (pathname === "/terminal") {
+        const data: TermData = {
+          root,
+          cols: Number(url.searchParams.get("cols")) || 80,
+          rows: Number(url.searchParams.get("rows")) || 24,
+        };
+        if (server.upgrade(req, { data })) return undefined;
+        return new Response("websocket upgrade failed", { status: 400 });
+      }
 
       if (pathname === "/api/health") return json({ ok: true, root });
 

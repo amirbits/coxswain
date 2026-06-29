@@ -43,12 +43,14 @@ export function Explorer({
   changesActive,
   onSelect,
   onOpenChanges,
+  onNewTerminal,
 }: {
   tree: TreeEntry[];
   activeKey: string | null; // active file path, for highlight
   changesActive: boolean;
   onSelect: (path: string) => void;
   onOpenChanges: () => void;
+  onNewTerminal: () => void;
 }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const root = buildTree(tree);
@@ -72,6 +74,9 @@ export function Explorer({
         <div className={`row file changes-row${changesActive ? " selected" : ""}`} onClick={onOpenChanges} title="all changed files in one scroll">
           <span className="name">✦ All changes</span>
           {changedCount > 0 && <span className="cbadge">{changedCount}</span>}
+        </div>
+        <div className="row file term-row" onClick={onNewTerminal} title="open a shell in the repo root">
+          <span className="name">⌗ New terminal</span>
         </div>
         {intent && <FileRow entry={intent} depth={0} pinned selected={activeKey === "INTENT.md"} onSelect={onSelect} />}
         {root.children
