@@ -28,6 +28,7 @@
   --ok-line: #bbf7d0;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color-scheme: light;
 }
 
 * {
@@ -897,6 +898,13 @@ code {
   border: 1px solid var(--line-strong);
   border-radius: 7px;
   background: var(--panel);
+  color: var(--ink);
+}
+/* native dropdown list: color-scheme (above) themes it in Chrome/Safari; this
+   covers Firefox, which honors explicit option colors. */
+.mode-bar select option {
+  background: var(--panel);
+  color: var(--ink);
 }
 .mode-bar input {
   width: 130px;
@@ -1441,6 +1449,7 @@ code {
   --error-line: #522;
   --ok-bg: #1f3a2c;
   --ok-line: #2c5a3e;
+  color-scheme: dark;
 }
 [data-theme="dark"] body {
   background: var(--bg);

@@ -7,8 +7,8 @@
 
 A local-first **command-and-control workspace for agentic software work**. You `cd`
 into any git repo, run one binary, and Helm serves a localhost web UI that shows the
-project through several **views** — its intent (this file) and its diff — all projected
-from one source of truth: the git working tree itself.
+project through several **views** — its intent (this file), its files, and its diff — all
+projected from one source of truth: the git working tree itself.
 
 Every view is **reviewable**: you can comment on a region like in a Google Doc or a PR
 review, and an agent can read those comments, reply, and revise the files. Review
@@ -28,8 +28,8 @@ one truth, with review and the decision log as a **byproduct** of working.
 ## Invariants (do not break)
 
 - The git working tree is the **only** source of truth. No parallel state store.
-- The agent edits the working tree and **never commits**. The human commits — and that
-  act *is* acceptance.
+- Work is **reviewable before it's accepted**: comments and suggestions land on the
+  working tree, you review them, and accepting is a commit / push / merge.
 - Every capability is a deterministic typed function first; the LLM only routes to it.
 - All steering flows through this surface (comments-as-files the agent reads), never
   through side channels the views cannot observe.
@@ -63,4 +63,4 @@ uses, just a different front door (no new protocol, no daemon). An agent can:
 All of it is reading and writing the same files (`.reviews/`, the working tree) the
 views are projected from. A **suggested edit** is a proposed `base → newText`
 replacement that lives in the comment thread; applying it write-throughs to the file.
-Like everything the agent does, it **never commits** — you accept by committing.
+Like everything the agent does, it lands on the working tree to be reviewed — you accept by committing.

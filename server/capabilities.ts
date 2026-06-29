@@ -23,7 +23,7 @@ export function buildRegistry(deps: { root: string; store: Store }): Registry {
     await store.writeIntent(String(a.content ?? ""));
     return store.readIntent();
   });
-  reg.register("writeFile", "Write a repo file (write-through, never commits)", async (a: any) => {
+  reg.register("writeFile", "Write a repo file (write-through)", async (a: any) => {
     const path = String(a.path ?? "");
     if (!path) throw new Error("path required");
     await store.writeFile(path, String(a.content ?? ""));

@@ -36,8 +36,7 @@ export class Store {
   }
 
   // Write an arbitrary repo file (write-through for the editor). Guards against
-  // path traversal and refuses binary paths; the editor only edits text. Never
-  // commits — acceptance is still the human's commit.
+  // path traversal and refuses binary paths; the editor only edits text.
   async writeFile(path: string, content: string): Promise<void> {
     const root = resolve(this.root);
     const full = resolve(root, path);

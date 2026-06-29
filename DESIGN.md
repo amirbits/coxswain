@@ -92,7 +92,7 @@ property that keeps the views genuinely bound to one truth.
 |---|---|---|---|
 | Intent / spec | `INTENT.md` (later `.intent/` for multi-doc) | file read | view write-through / agent |
 | Code | source files | file read | agent / editor |
-| Diff & history | `.git` | `git` CLI | git commits (human only) |
+| Diff & history | `.git` | `git` CLI | git commits |
 | Comments / review | `.reviews/<id>.json` | file read | API write / agent append |
 
 **Decision — comments live in-repo for v1.** Committing `.reviews/` into the
@@ -228,12 +228,12 @@ the surface never sees.
 
 ## 7. Acceptance boundary
 
-- The agent edits the **working tree only** and **never commits.**
-- The human accepts by `git commit` → push → merge. The diff view is the live
-  uncommitted (or vs-branch) diff; commit is the accept action.
-- In Phase 2 (drive mode), configure Claude Code so it cannot auto-commit;
-  if it controls the commit boundary, the "no more blind acceptance" guarantee
-  silently breaks.
+- The point is **reviewability before acceptance**, not restricting who commits. The
+  agent works in the working tree; you review the diff and the threads; accepting is a
+  `git commit` → push → merge.
+- The diff view is the live uncommitted (or vs-branch) diff; a commit is the accept
+  action. Helm makes the work reviewable *before* you accept it — whether you or the
+  agent runs the commit is up to you.
 
 ## 8. Phasing roadmap
 
@@ -295,7 +295,7 @@ accept any unique prefix (like git).
 | `show <id>` | `getThread` | one thread, decorated, with any suggestion |
 | `reply <id> <text>` | `replyComment` | author forced to `agent` |
 | `suggest <id> <text>` | `suggestEdit` | `--stdin` / `--file` for the new text; `--base` to set what it replaces |
-| `apply <id>` | `applySuggestion` | write-through; never commits |
+| `apply <id>` | `applySuggestion` | write-through to the file |
 | `dismiss <id>` | `dismissSuggestion` | |
 | `resolve` / `reopen <id>` | `resolve/reopenComment` | |
 
@@ -320,7 +320,7 @@ A suggestion is a normal message that also carries a proposed replacement:
   the quote for intent) or supplied explicitly with `--base`. Using literal text,
   not line numbers, makes apply drift-safe and sidesteps the diff-marker /
   markdown-source fidelity traps entirely.
-- Applying edits the **working tree only**; acceptance is still the human's commit
+- Applying edits the **working tree only**; you review it, then accept by committing
   (§7). The thread now records the proposal, its rationale, and whether it was taken.
 
 ### Non-goals (kept deliberately small)
@@ -328,8 +328,8 @@ A suggestion is a normal message that also carries a proposed replacement:
 - Suggestions are **single-region replacements** — the thing the comment is about —
   not multi-file patches. For broader changes the agent edits directly and you review
   the diff. Two clean modes: **suggest** (scoped, non-destructive, apply-on-click) vs
-  **edit** (direct, you commit/restore). Both end at the same boundary: your commit.
-- `apply` never commits, and the CLI exposes no commit verb.
+  **edit** (direct, you commit/restore). Both end at the same boundary: a reviewed commit.
+- `apply` write-throughs to the file; committing stays a separate, deliberate step.
 
 ## 12. File-centric views + content anchors (v2)
 

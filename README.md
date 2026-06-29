@@ -13,8 +13,8 @@ See [`INTENT.md`](./INTENT.md) for what Helm is, and [`DESIGN.md`](./DESIGN.md) 
 
 Helm watches the filesystem + git and renders live. You run your own Claude Code;
 you steer it by leaving review comments that persist as files under `.reviews/`;
-the agent reads them, edits files, and the UI repaints live. **Helm never commits —
-you do, and that is acceptance.**
+the agent reads them, edits files, and the UI repaints live. The point is that the work
+is **reviewable before you accept it** — accepting is a commit / merge.
 
 ## Quick start
 
@@ -41,7 +41,7 @@ Flags (`helm --help`): `--port <n>`, `--base <ref>` (PR-style `base...HEAD` diff
    leave a comment. It is saved as a file under `.reviews/`.
 4. Tell your Claude Code: **“address the open review comments.”** It reads `.reviews/`,
    edits files, optionally appends replies. The UI repaints — no refresh.
-5. When you are satisfied, **you** `git commit`. That is acceptance.
+5. When you're satisfied, **commit** (or merge) to accept.
 
 ## Agent CLI
 
@@ -59,7 +59,7 @@ helm show <id>          # one thread in full (id = any unique prefix, like git)
 helm reply <id> "…"     # answer a thread, as the agent
 helm comment <path> <line> # open a thread as the agent (--end <line> for a range; --stdin / --file for the body)
 helm suggest <id> "…"   # propose a replacement for the thread's region (--stdin / --replaces)
-helm apply <id>         # apply that suggestion to the file (you still commit to accept)
+helm apply <id>         # apply that suggestion to the file (write-through; review then commit)
 helm resolve <id>       # mark it done
 helm <verb> --json      # structured output, for parsing
 ```
@@ -67,14 +67,14 @@ helm <verb> --json      # structured output, for parsing
 A **suggested edit** is the non-destructive option: the agent proposes a
 `base → newText` replacement (stored in the thread), and you **Apply** it with one
 click in the UI — or `helm apply`. Applying write-throughs to the working tree;
-acceptance is still your commit. To change files directly instead, the agent just
+you review it, then commit to accept. To change files directly instead, the agent just
 edits them and you review the diff.
 
 Paste-to-your-agent:
 
 > Run `helm context` to orient, then `helm comments`. For each open thread, either
 > `helm reply <id> "…"` with an answer, or make the change — directly (edit the files)
-> or as a `helm suggest <id> --stdin` proposal. Never `git commit`.
+> or as a `helm suggest <id> --stdin` proposal.
 
 ## How the agent participates
 
@@ -105,7 +105,7 @@ To wire your agent, tell it:
 > Read every `*.json` under `.reviews/` whose `status` is `open`. For each, do what
 > the latest human message asks by editing the working-tree files its anchor points
 > to. Then append a reply — push `{ "author": "agent", "body": "…", "ts": "<ISO>" }`
-> onto that file's `thread` array. **Do not commit;** the human accepts by committing.
+> onto that file's `thread` array. The human reviews the change and accepts by committing.
 
 The filesystem watcher picks up the agent's edits and reply, and every connected
 browser re-projects state live.
@@ -125,6 +125,6 @@ browser re-projects state live.
 ## Invariants
 
 - The git working tree is the only source of truth; nothing is cached in a parallel store.
-- The agent edits the working tree and **never commits**.
+- Work is reviewable before it's accepted; acceptance is a commit / push / merge.
 - Every capability is a deterministic typed function (the registry) before any LLM routes to it.
 - All steering flows through the surface (comments-as-files), never side channels the views can't see.

@@ -385,7 +385,7 @@ function CodePane(props: Props & { canEdit: boolean }) {
             </span>
             <span className="spacer" />
             {canEdit && !sel && (
-              <button className="btn small" onClick={startEdit} title="Edit this file (write-through, never commits)">
+              <button className="btn small" onClick={startEdit} title="Edit this file (write-through)">
                 Edit
               </button>
             )}

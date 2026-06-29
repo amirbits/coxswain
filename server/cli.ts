@@ -53,7 +53,7 @@ const HELP = `helm — agent + human CLI over the review surface
                (default)        working tree (uncommitted)
   --json   structured output      <id>  any unique prefix, like git
 
-The agent edits the working tree and never commits — you accept by committing.`;
+Changes land in the working tree for review; you accept by committing.`;
 
 export async function runCli(rawArgs: string[]): Promise<number> {
   const verb = rawArgs[0];

@@ -24,10 +24,10 @@ accepted — and acceptance is just `git commit` / push / merge.
    file; the agent operates on the same file. This is what makes the views
    genuinely bound to one truth instead of drifting copies.
 
-2. **Acceptance = git, not a UI button.** The agent edits the **working tree
-   only**. The agent must **not commit.** The human commits / pushes / merges,
-   and that act *is* acceptance. This single invariant is what preserves the
-   whole "humans stop rubber-stamping" thesis. Enforce it.
+2. **Acceptance = git, not a UI button.** The agent works in the **working tree**; you
+   review the diff and the threads, and acceptance is a `git commit` / push / merge.
+   The goal is **reviewability before acceptance** — no more rubber-stamping — not
+   restricting who runs the commit.
 
 3. **Reviewable is a real, enforceable contract** (an *interaction* contract,
    not a correctness one): a view implements Reviewable if it can render
@@ -125,7 +125,7 @@ and that, not any bug, is the most important result to act on.
 
 - The working tree is the only source of truth; never cache project state in a
   parallel store that can drift.
-- The agent edits the working tree and **never commits**.
+- Work is reviewable before it's accepted; acceptance is a commit / push / merge.
 - Every capability exists as a deterministic function before any LLM touches it.
 - If steering ever happens somewhere the views can't observe, the decision log
   becomes fiction — so all steering must flow through the surface (in Phase 1,

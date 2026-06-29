@@ -59,7 +59,7 @@ export async function call<T = unknown>(name: string, args: unknown): Promise<T>
 }
 
 // Write-through for the editor. INTENT.md goes through writeIntent; everything
-// else through writeFile. Never commits — acceptance is the human's commit.
+// else through writeFile. Write-through to the working tree.
 export async function editFile(path: string, content: string): Promise<void> {
   const fn = path === "INTENT.md" ? "writeIntent" : "writeFile";
   await call(fn, fn === "writeIntent" ? { content } : { path, content });
