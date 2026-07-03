@@ -117,7 +117,7 @@ export async function startServer(opts: ServerOptions) {
       }
 
       if (pathname === "/api/call" && req.method === "POST") {
-        if (req.headers.get("x-helm-token") !== token) {
+        if (req.headers.get("x-cox-token") !== token) {
           return json({ ok: false, error: "forbidden" }, 403);
         }
         let body: any;
@@ -141,7 +141,7 @@ export async function startServer(opts: ServerOptions) {
       return new Response("Not found", { status: 404 });
     },
     error(e) {
-      console.error("helm: request error:", e);
+      console.error("cox: request error:", e);
       return json({ error: errMsg(e) }, 500);
     },
   });
@@ -165,7 +165,7 @@ async function serveStatic(pathname: string): Promise<Response> {
     return new Response(embedded.bytes, { headers: { "Content-Type": embedded.type } });
   }
 
-  // 2. disk (running uncompiled from the helm repo, after `vite build`)
+  // 2. disk (running uncompiled from the cox repo, after `vite build`)
   if (!hasEmbedded()) {
     const file = Bun.file(join(DIST_DIR, path));
     if (await file.exists()) return new Response(file);
@@ -182,7 +182,7 @@ async function serveStatic(pathname: string): Promise<Response> {
   }
 
   return new Response(
-    "Helm frontend not built. Run `bun run dev` (Vite) or `bun run build`.",
+    "Coxswain frontend not built. Run `bun run dev` (Vite) or `bun run build`.",
     { status: 404 },
   );
 }

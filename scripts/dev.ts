@@ -1,5 +1,5 @@
-// One-command dev: start the Bun API server (watching the Helm repo itself, so
-// you dogfood Helm on Helm) and Vite (which serves the UI with HMR and proxies
+// One-command dev: start the Bun API server (watching the Coxswain repo itself, so
+// you dogfood Coxswain on Coxswain) and Vite (which serves the UI with HMR and proxies
 // /api + /events to the server). Ctrl-C stops both.
 
 import { join } from "node:path";

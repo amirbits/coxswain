@@ -1,5 +1,5 @@
 // The agent-facing CLI: a front door onto the same function registry the UI and
-// HTTP API use (see docs/intent/SPEC.md). `helm <verb>` is a one-shot call against
+// HTTP API use (see docs/intent/SPEC.md). `cox <verb>` is a one-shot call against
 // the working tree — no server required.
 
 import { resolve } from "node:path";
@@ -26,27 +26,27 @@ type Flags = {
   tag?: string;
 };
 
-const HELP = `helm — agent + human CLI over the review surface
+const HELP = `cox — agent + human CLI over the review surface
 
-  helm                       serve the UI (default)
-  helm context               repo + intent + changed files + open comments (one shot)
-  helm status                branch, change count, comment counts
-  helm intent                print the intent doc
-  helm tree [--all]          file explorer: changed + commented files (--all = every file)
-  helm file <path>           print a file's current content
-  helm diff [path]           diff (whole repo, or one file)
-  helm comments [--all]      list review threads (default: open + outdated)
-  helm show <id>             one thread in full (messages + any suggestion)
-  helm comment <path> <line> open a thread as the agent (--end <line> for a range;
+  cox                       serve the UI (default)
+  cox context               repo + intent + changed files + open comments (one shot)
+  cox status                branch, change count, comment counts
+  cox intent                print the intent doc
+  cox tree [--all]          file explorer: changed + commented files (--all = every file)
+  cox file <path>           print a file's current content
+  cox diff [path]           diff (whole repo, or one file)
+  cox comments [--all]      list review threads (default: open + outdated)
+  cox show <id>             one thread in full (messages + any suggestion)
+  cox comment <path> <line> open a thread as the agent (--end <line> for a range;
                                --stdin / --file for the body). Captures the anchored
                                text as context so the thread can go outdated.
-  helm reply <id> <text>     append a reply, as the agent
-  helm suggest <id> <text>   propose a replacement for the thread's region
+  cox reply <id> <text>     append a reply, as the agent
+  cox suggest <id> <text>   propose a replacement for the thread's region
                                --stdin / --file  read the new text
                                --replaces "<text>"  set exactly what it replaces
-  helm apply <id>            apply the thread's pending suggestion (write-through)
-  helm dismiss <id>          dismiss it
-  helm resolve | reopen <id> change thread status
+  cox apply <id>            apply the thread's pending suggestion (write-through)
+  cox dismiss <id>          dismiss it
+  cox resolve | reopen <id> change thread status
 
   diff modes:  --branch <ref>   merge-request diff (ref...HEAD)
                --ref|--tag <r>  vs a commit or tag (r..HEAD)
@@ -67,7 +67,7 @@ export async function runCli(rawArgs: string[]): Promise<number> {
   const cwd = flags.dir ? resolve(flags.dir) : process.cwd();
   const root = await repoRoot(cwd);
   if (!root) {
-    console.error(`helm: ${cwd} is not a git repository.`);
+    console.error(`cox: ${cwd} is not a git repository.`);
     return 1;
   }
 
@@ -168,7 +168,7 @@ export async function runCli(rawArgs: string[]): Promise<number> {
         if (!newText) throw new Error("new text is required (positional, --stdin, or --file)");
         const t = await call<DecoratedThread>("suggestEdit", { id, newText, base: flags.replaces, body: flags.body });
         const s = lastSuggestion(t);
-        emit(`suggestion added to ${short(id)}\n${s ? fmtSuggestion(s) + "\n" : ""}apply: helm apply ${short(id)}`, t);
+        emit(`suggestion added to ${short(id)}\n${s ? fmtSuggestion(s) + "\n" : ""}apply: cox apply ${short(id)}`, t);
         return 0;
       }
       case "apply": {
@@ -191,11 +191,11 @@ export async function runCli(rawArgs: string[]): Promise<number> {
         return 0;
       }
       default:
-        console.error(`helm: unknown command "${verb}". Run \`helm help\`.`);
+        console.error(`cox: unknown command "${verb}". Run \`cox help\`.`);
         return 1;
     }
   } catch (e) {
-    console.error(`helm: ${e instanceof Error ? e.message : String(e)}`);
+    console.error(`cox: ${e instanceof Error ? e.message : String(e)}`);
     return 1;
   }
 }
@@ -297,7 +297,7 @@ function timeAgo(ts: string): string {
 function fmtComments(threads: DecoratedThread[], all: boolean): string {
   const c = (s: string) => threads.filter((t) => t.effectiveStatus === s).length;
   const shown = all ? threads : threads.filter((t) => t.effectiveStatus !== "resolved");
-  if (!shown.length) return all ? "No comments." : "No open comments. (helm comments --all for resolved)";
+  if (!shown.length) return all ? "No comments." : "No open comments. (cox comments --all for resolved)";
   const header = `${c("open")} open · ${c("outdated")} outdated · ${c("resolved")} resolved\n`;
   const rows = shown.map((t) => {
     const last = t.thread[t.thread.length - 1];
@@ -334,7 +334,7 @@ function fmtStatus(s: StatusShape): string {
 
 function fmtTree(ws: Workspace, all: boolean): string {
   const entries = all ? ws.tree : ws.tree.filter((e) => e.status || e.open || e.outdated);
-  if (!entries.length) return all ? "(empty)" : "No changed or commented files. (helm tree --all)";
+  if (!entries.length) return all ? "(empty)" : "No changed or commented files. (cox tree --all)";
   return entries
     .map((e) => {
       const st = e.status ? e.status : " ";
@@ -353,7 +353,7 @@ function fmtContext(ws: Workspace, intent: { content: string; exists: boolean })
   o += `\n── intent ──────────────────────────────\n${intent.exists ? intent.content.trim() : "(no intent doc yet)"}\n`;
   o += `\n── changes (${modeLabel}) ─────────────────  ${changed.length} file(s)\n`;
   o += (changed.length ? changed.map((e) => ` ${e.status}  ${e.path}`).join("\n") : "  (none)") + "\n";
-  o += `  → helm diff [path] for the diff\n`;
+  o += `  → cox diff [path] for the diff\n`;
   o += `\n── open comments ───────────────────────  ${open.length}\n`;
   o += open.length
     ? open.map((t) => ` ${GLYPH[t.effectiveStatus] ?? "•"} ${short(t.id)} ${where(t)}  "${oneLine(t.thread[t.thread.length - 1].body, 40)}"`).join("\n")

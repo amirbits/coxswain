@@ -1,6 +1,6 @@
 // Reads web/dist and emits server/assets.generated.ts — a base64 map of the
 // built frontend. `bun build --compile` then bakes that module into the binary,
-// so `helm` is a single self-contained file that needs no web/dist on disk.
+// so `cox` is a single self-contained file that needs no web/dist on disk.
 // The generated file is gitignored; it is produced fresh on every build.
 
 import { readdir, readFile, writeFile } from "node:fs/promises";

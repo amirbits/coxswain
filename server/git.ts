@@ -1,4 +1,4 @@
-// git CLI adapter. Helm holds no authoritative state — every fact about history,
+// git CLI adapter. Coxswain holds no authoritative state — every fact about history,
 // diff, branch, and file content is read from git / the filesystem on demand.
 
 import { existsSync, statSync } from "node:fs";
@@ -290,7 +290,7 @@ async function untrackedDiff(root: string): Promise<string> {
     const r = await git(root, ["ls-files", "--others", "--exclude-standard", "-z"]);
     if (!r.ok) return "";
     const files = r.stdout.split("\0").filter((f) => keepPath(f));
-    if (files.length > 100) console.warn(`helm: ${files.length} untracked files; diffing the first 100 (use 'git add' to stage the rest).`);
+    if (files.length > 100) console.warn(`cox: ${files.length} untracked files; diffing the first 100 (use 'git add' to stage the rest).`);
     const capped = files.slice(0, 100);
     let out = "";
     for (const f of capped) {

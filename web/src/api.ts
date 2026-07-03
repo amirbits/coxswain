@@ -68,7 +68,7 @@ export async function fetchFile(path: string, mode: DiffMode): Promise<FilePaylo
 export async function call<T = unknown>(name: string, args: unknown): Promise<T> {
   const res = await fetch("/api/call", {
     method: "POST",
-    headers: { "content-type": "application/json", "x-helm-token": await authToken() },
+    headers: { "content-type": "application/json", "x-cox-token": await authToken() },
     body: JSON.stringify({ name, args }),
   });
   const data = await res.json().catch(() => ({}));

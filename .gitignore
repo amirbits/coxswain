@@ -4,7 +4,7 @@ node_modules/
 # build output
 dist/
 web/dist/
-/helm
+/cox
 server/assets.generated.ts
 
 # misc
@@ -17,5 +17,5 @@ server/assets.generated.ts
 # local, machine-specific Claude Code settings
 .claude/settings.local.json
 
-# Helm review threads — kept local, not shared via git
+# Coxswain review threads — kept local, not shared via git
 .reviews/

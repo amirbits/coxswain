@@ -1,5 +1,5 @@
 // Full production build: build the web app, embed it, then compile a single
-// self-contained `helm` binary. Run with `bun run build`.
+// self-contained `cox` binary. Run with `bun run build`.
 
 import { join } from "node:path";
 
@@ -22,8 +22,8 @@ await run([
   "build",
   "--compile",
   "--outfile",
-  join(root, "helm"),
+  join(root, "cox"),
   join(root, "server/index.ts"),
 ]);
 
-console.log("\n✓ built ./helm — run it inside any git repo (e.g. `cd ~/some-repo && /path/to/helm`)");
+console.log("\n✓ built ./cox — run it inside any git repo (e.g. `cd ~/some-repo && /path/to/cox`)");

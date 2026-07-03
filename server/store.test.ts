@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Store } from "./store";
 
-const root = mkdtempSync(join(tmpdir(), "helm-store-"));
+const root = mkdtempSync(join(tmpdir(), "cox-store-"));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 
 describe("withThreadLock (F4)", () => {

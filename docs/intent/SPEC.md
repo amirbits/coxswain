@@ -1,6 +1,6 @@
-# Helm — Spec & Intent
+# Coxswain — Spec & Intent
 
-> This is the project's intent: edit it to change what Helm should be. Helm pins it in
+> This is the project's intent: edit it to change what Coxswain should be. Coxswain pins it in
 > the explorer; comment on a line to question or refine it.
 
 ## What it is
@@ -12,7 +12,7 @@ tree — and every view is reviewable.
 ## Invariants
 
 - The git working tree is the only source of truth. No parallel state store.
-- Work is reviewable before it's accepted. Acceptance is a commit / merge; Helm does not
+- Work is reviewable before it's accepted. Acceptance is a commit / merge; Coxswain does not
   restrict who commits.
 - Every capability is a deterministic typed function (the registry) before any LLM
   routes to it.
@@ -41,7 +41,7 @@ drift or ambiguity. The agent reads `.reviews/`, edits the tree, and appends rep
 
 ## Front doors
 
-One function registry, reached four ways: the UI, `POST /api/call`, the `helm` CLI, and
+One function registry, reached four ways: the UI, `POST /api/call`, the `cox` CLI, and
 (planned) a natural-language bar. State streams over SSE; the terminal over a WebSocket.
 
 ## Deferred

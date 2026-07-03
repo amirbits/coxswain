@@ -14,7 +14,7 @@ import { Composer } from "./Composer";
 import { ThreadCard, type ThreadActions } from "./ThreadCard";
 
 // Class-based highlight style so token colors adapt to dark mode via CSS.
-const helmHighlight = HighlightStyle.define([
+const coxHighlight = HighlightStyle.define([
   { tag: tags.keyword, class: "tok-kw" },
   { tag: [tags.name, tags.variableName, tags.propertyName], class: "tok-var" },
   { tag: tags.string, class: "tok-str" },
@@ -274,7 +274,7 @@ function CodePane(props: Props & { canEdit: boolean }) {
             },
           },
         }),
-        syntaxHighlighting(helmHighlight),
+        syntaxHighlighting(coxHighlight),
         selField,
         decorationsPlugin(ctxRef, composerRef),
         languageComp.of([]),

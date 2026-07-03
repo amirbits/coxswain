@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startServer } from "./server";
 
-const root = mkdtempSync(join(tmpdir(), "helm-server-"));
+const root = mkdtempSync(join(tmpdir(), "cox-server-"));
 const git = (...args: string[]) => execFileSync("git", ["-C", root, ...args], { stdio: "pipe" });
 
 let base = "";
@@ -53,7 +53,7 @@ describe("trust boundary (F1/F2)", () => {
   test("/api/call with the token succeeds", async () => {
     const r = await fetch(`${base}/api/call`, {
       method: "POST",
-      headers: { "content-type": "application/json", "x-helm-token": token },
+      headers: { "content-type": "application/json", "x-cox-token": token },
       body: JSON.stringify({ name: "getIntent", args: {} }),
     });
     expect(r.status).toBe(200);

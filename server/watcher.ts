@@ -32,7 +32,7 @@ export function startWatcher(
   });
 
   watcher.on("error", (err) => {
-    console.error("helm: watcher error:", err);
+    console.error("cox: watcher error:", err);
   });
 
   return watcher;

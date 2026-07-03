@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { status } from "./git";
 
-const root = mkdtempSync(join(tmpdir(), "helm-git-"));
+const root = mkdtempSync(join(tmpdir(), "cox-git-"));
 const git = (...args: string[]) => execFileSync("git", ["-C", root, ...args], { stdio: "pipe" });
 
 beforeAll(() => {

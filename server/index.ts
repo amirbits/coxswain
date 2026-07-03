@@ -1,4 +1,4 @@
-// Entry point. `cd <repo> && helm` resolves the repo root, finds an open port,
+// Entry point. `cd <repo> && cox` resolves the repo root, finds an open port,
 // starts the server, and opens the browser (see docs/intent/SPEC.md).
 
 import { createServer as netServer } from "node:net";
@@ -9,7 +9,7 @@ import { repoRoot } from "./git";
 import { startServer } from "./server";
 
 // Subcommands (the agent CLI) are a fourth front door onto the function
-// registry; bare `helm` serves the UI (see docs/intent/SPEC.md).
+// registry; bare `cox` serves the UI (see docs/intent/SPEC.md).
 const VERBS = new Set([
   "context", "status", "intent", "tree", "file", "diff", "comments", "show",
   "reply", "suggest", "apply", "dismiss", "resolve", "reopen", "comment", "help",
@@ -17,13 +17,13 @@ const VERBS = new Set([
 const firstArg = Bun.argv[2];
 if (firstArg && !firstArg.startsWith("-")) {
   if (VERBS.has(firstArg)) process.exit(await runCli(Bun.argv.slice(2)));
-  console.error(`helm: unknown command "${firstArg}". Run \`helm help\`, or \`helm\` to serve the UI.`);
+  console.error(`cox: unknown command "${firstArg}". Run \`cox help\`, or \`cox\` to serve the UI.`);
   process.exit(1);
 }
 
-const HELP = `helm — a local-first command-and-control workspace for agentic work
+const HELP = `cox — a local-first command-and-control workspace for agentic work
 
-Usage: helm [options]
+Usage: cox [options]
 
 Options:
   --port <n>     Preferred port (default 4317; the next free port is used if taken)
@@ -55,7 +55,7 @@ if (values.help) {
 const cwd = values.dir ? resolve(values.dir) : process.cwd();
 const root = await repoRoot(cwd);
 if (!root) {
-  console.error(`helm: ${cwd} is not a git repository.\nRun \`git init\` there first, then \`helm\`.`);
+  console.error(`cox: ${cwd} is not a git repository.\nRun \`git init\` there first, then \`cox\`.`);
   process.exit(1);
 }
 
@@ -70,7 +70,7 @@ const { server } = await startServer({
 });
 
 const url = `http://localhost:${server.port}`;
-console.log(`\n  ⎈  Helm → ${url}\n     repo: ${root}\n`);
+console.log(`\n  🚣  Coxswain → ${url}\n     repo: ${root}\n`);
 
 if (!values["no-open"] && !values.dev) openBrowser(url);
 

@@ -5,8 +5,8 @@ import { join } from "node:path";
 import { resolveInRepo } from "./paths";
 
 // A repo with a symlink pointing outside its own tree (the F5 case).
-const root = mkdtempSync(join(tmpdir(), "helm-paths-"));
-const outside = mkdtempSync(join(tmpdir(), "helm-outside-"));
+const root = mkdtempSync(join(tmpdir(), "cox-paths-"));
+const outside = mkdtempSync(join(tmpdir(), "cox-outside-"));
 mkdirSync(join(root, "src"));
 writeFileSync(join(root, "src", "a.ts"), "x");
 writeFileSync(join(outside, "secret.txt"), "s3cret");
