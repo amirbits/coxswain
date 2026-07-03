@@ -4,6 +4,7 @@
 import { existsSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { resolveInRepo } from "./paths";
 import type {
   ChangeStatus,
   DiffMode,
@@ -57,23 +58,33 @@ export async function refExists(root: string, ref: string): Promise<boolean> {
 
 export async function status(root: string): Promise<RepoStatus> {
   const [branch, head] = await Promise.all([currentBranch(root), headSha(root)]);
-  const r = await git(root, ["status", "--porcelain=v1", "-b", "--untracked-files=all"]);
+  // -z: NUL-delimited and *unquoted*, and it splits a rename/copy into two
+  // fields — the new path, then the old. (Plain porcelain renders a rename as
+  // the ambiguous "old -> new" and C-quotes non-ASCII paths, both of which
+  // corrupt the path we hand the UI.)
+  const r = await git(root, ["status", "--porcelain=v1", "-z", "-b", "--untracked-files=all"]);
   const files: RepoStatusFile[] = [];
   let upstream: string | null = null;
   let ahead = 0;
   let behind = 0;
-  for (const line of r.stdout.split("\n")) {
-    if (!line) continue;
-    if (line.startsWith("## ")) {
+  const toks = r.stdout.split("\0");
+  for (let i = 0; i < toks.length; i++) {
+    const tok = toks[i];
+    if (!tok) continue;
+    if (tok.startsWith("## ")) {
       // "## main...origin/main [ahead 2, behind 1]" — upstream + tracking counts.
-      const refs = line.slice(3).split(" ")[0]; // "main...origin/main" or "HEAD"
+      const refs = tok.slice(3).split(" ")[0]; // "main...origin/main" or "HEAD"
       const dots = refs.indexOf("...");
       if (dots >= 0) upstream = refs.slice(dots + 3) || null;
-      ahead = parseInt(line.match(/ahead (\d+)/)?.[1] ?? "0", 10) || 0;
-      behind = parseInt(line.match(/behind (\d+)/)?.[1] ?? "0", 10) || 0;
+      ahead = parseInt(tok.match(/ahead (\d+)/)?.[1] ?? "0", 10) || 0;
+      behind = parseInt(tok.match(/behind (\d+)/)?.[1] ?? "0", 10) || 0;
       continue;
     }
-    files.push({ index: line[0], worktree: line[1], path: line.slice(3) });
+    const index = tok[0];
+    const worktree = tok[1];
+    files.push({ index, worktree, path: tok.slice(3) });
+    // A rename/copy carries its origin path in the following NUL field; skip it.
+    if (index === "R" || index === "C" || worktree === "R" || worktree === "C") i++;
   }
   return { branch, head, upstream, ahead, behind, files };
 }
@@ -302,10 +313,7 @@ export async function readFileContent(
   root: string,
   path: string,
 ): Promise<{ content: string; exists: boolean; kind: FileKind }> {
-  const full = resolve(root, path);
-  if (full !== resolve(root) && !full.startsWith(resolve(root) + "/")) {
-    throw new Error("path escapes repository");
-  }
+  const full = resolveInRepo(root, path);
   if (!existsSync(full)) return { content: "", exists: false, kind: "text" };
   try {
     if (statSync(full).size > 2 * 1024 * 1024) return { content: "", exists: true, kind: "binary" };

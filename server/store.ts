@@ -2,9 +2,10 @@
 // in-repo as plain JSON. On read, threads are normalized to the v2 content-anchor
 // shape (see docs/intent/SPEC.md) via a compat shim, so older comments keep working.
 
-import { closeSync, existsSync, openSync, statSync, unlinkSync, writeSync } from "node:fs";
+import { closeSync, existsSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync, writeSync } from "node:fs";
 import { mkdir, readdir, readFile, writeFile as fsWriteFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join } from "node:path";
+import { resolveInRepo } from "./paths";
 import type { Anchor, Author, IntentPayload, Message, Thread, ThreadStatus } from "./types";
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -48,9 +49,7 @@ export class Store {
   // Write an arbitrary repo file (write-through for the editor). Guards against
   // path traversal and refuses binary paths; the editor only edits text.
   async writeFile(path: string, content: string): Promise<void> {
-    const root = resolve(this.root);
-    const full = resolve(root, path);
-    if (full !== root && !full.startsWith(root + "/")) throw new Error("path escapes repository");
+    const full = resolveInRepo(this.root, path);
     await mkdir(dirname(full), { recursive: true });
     await fsWriteFile(full, content, "utf8");
   }
@@ -101,35 +100,45 @@ export class Store {
   private async withThreadLock<T>(id: string, fn: () => Promise<T>): Promise<T> {
     await mkdir(this.reviewsDir(), { recursive: true });
     const lock = this.lockPath(id);
+    const mine = `${lock}.${process.pid}`;
     const staleMs = 30_000;
     const deadline = Date.now() + 5000;
-    let acquired = false;
-    while (Date.now() < deadline) {
+    let held = false;
+    while (!held && Date.now() < deadline) {
       try {
-        const fd = openSync(lock, "wx"); // O_EXCL | O_CREAT
+        const fd = openSync(lock, "wx"); // O_EXCL | O_CREAT — one winner when uncontended
         writeSync(fd, String(process.pid));
         closeSync(fd);
-        acquired = true;
-        break;
+        held = true;
       } catch (e: any) {
         if (e?.code !== "EEXIST") throw e;
-        try {
-          if (Date.now() - statSync(lock).mtimeMs > staleMs) unlinkSync(lock);
-        } catch {
-          // lock vanished in a race — loop and retry
-        }
+        held = this.stealIfStale(lock, mine, staleMs);
+        if (!held) await sleep(15);
       }
-      await sleep(15);
     }
-    if (!acquired) throw new Error(`could not acquire lock for thread ${id}`);
+    if (!held) throw new Error(`could not acquire lock for thread ${id}`);
     try {
       return await fn();
     } finally {
-      try {
-        unlinkSync(lock);
-      } catch {
-        // already gone — benign
-      }
+      try { unlinkSync(lock); } catch {} // release
+      try { unlinkSync(mine); } catch {} // best-effort temp cleanup
+    }
+  }
+
+  // Reclaim a crashed holder's lock without ever deleting a *live* one. The old
+  // stat-then-unlink was two steps: a peer could create a fresh lock in the gap
+  // and we'd delete it, leaving two holders racing the same read-modify-write.
+  // Instead, stamp a private pid file and atomically rename it over the lock,
+  // then confirm the lock reads back our pid. Racing stealers serialize on the
+  // rename so exactly one wins, and a still-fresh lock is left untouched.
+  private stealIfStale(lock: string, mine: string, staleMs: number): boolean {
+    try {
+      if (Date.now() - statSync(lock).mtimeMs <= staleMs) return false; // holder still alive
+      writeFileSync(mine, String(process.pid));
+      renameSync(mine, lock);
+      return readFileSync(lock, "utf8") === String(process.pid);
+    } catch {
+      return false; // lock vanished or we lost the rename race — caller retries
     }
   }
 
@@ -168,7 +177,7 @@ export class Store {
   // Suggestions -------------------------------------------------------------
 
   private targetFile(t: Thread): string {
-    return join(this.root, t.anchor.path);
+    return resolveInRepo(this.root, t.anchor.path);
   }
 
   private async deriveBase(t: Thread): Promise<string | null> {

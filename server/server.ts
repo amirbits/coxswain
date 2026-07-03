@@ -28,6 +28,14 @@ export async function startServer(opts: ServerOptions) {
   const { root } = opts;
   const store = new Store(root);
   const registry = buildRegistry({ root, store });
+
+  // A per-boot secret guarding the two doors that can execute or mutate: the PTY
+  // (/terminal) and the registry call (/api/call). It's handed to our own page
+  // through /api/boot — which the cross-origin guard keeps same-origin — so a
+  // foreign page the browser lets reach this local server can neither read it
+  // nor forge a request that carries it (see docs/intent/SPEC.md).
+  const token = crypto.randomUUID();
+
   const sse = new SSEHub();
   sse.startHeartbeat();
 
@@ -52,9 +60,21 @@ export async function startServer(opts: ServerOptions) {
       const url = new URL(req.url);
       const { pathname } = url;
 
+      // Trust boundary: the browser lets any origin reach this local server —
+      // WebSocket handshakes and "simple" POSTs bypass the same-origin policy —
+      // so refuse foreign origins on every live door. Static assets stay open;
+      // they're public and load via top-level navigation, which sends no Origin.
+      if (
+        (pathname.startsWith("/api/") || pathname === "/terminal" || pathname === "/events") &&
+        !isTrustedOrigin(req)
+      ) {
+        return json({ error: "cross-origin request refused" }, 403);
+      }
+
       if (pathname === "/events") return sse.handler();
 
       if (pathname === "/terminal") {
+        if (url.searchParams.get("token") !== token) return new Response("forbidden", { status: 403 });
         const data: TermData = {
           root,
           cols: Number(url.searchParams.get("cols")) || 80,
@@ -66,7 +86,7 @@ export async function startServer(opts: ServerOptions) {
 
       if (pathname === "/api/health") return json({ ok: true, root });
 
-      if (pathname === "/api/boot") return json({ mode: bootMode, root });
+      if (pathname === "/api/boot") return json({ mode: bootMode, root, token });
 
       if (pathname === "/api/registry") return json(registry.list());
 
@@ -97,6 +117,9 @@ export async function startServer(opts: ServerOptions) {
       }
 
       if (pathname === "/api/call" && req.method === "POST") {
+        if (req.headers.get("x-helm-token") !== token) {
+          return json({ ok: false, error: "forbidden" }, 403);
+        }
         let body: any;
         try {
           body = await req.json();
@@ -166,6 +189,22 @@ async function serveStatic(pathname: string): Promise<Response> {
 
 function modeFromQuery(url: URL): DiffMode {
   return parseMode({ kind: url.searchParams.get("mode"), ref: url.searchParams.get("ref") });
+}
+
+// The browser attaches an Origin to cross-origin WebSocket handshakes and to
+// cross-origin / POST fetches, but never enforces it — that's the server's job.
+// Trust only same-machine origins, on any port so the Vite dev proxy (:5173)
+// still reaches us. A missing Origin is a same-origin GET, a navigation, or the
+// in-process CLI — none of them the cross-site threat — so it's allowed.
+function isTrustedOrigin(req: Request): boolean {
+  const origin = req.headers.get("origin");
+  if (!origin) return true;
+  try {
+    const host = new URL(origin).hostname.replace(/^\[|\]$/g, "");
+    return host === "localhost" || host === "127.0.0.1" || host === "::1";
+  } catch {
+    return false;
+  }
 }
 
 function json(data: unknown, statusCode = 200): Response {

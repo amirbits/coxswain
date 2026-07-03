@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { Terminal as Xterm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
+import { terminalUrl } from "../api";
 import "@xterm/xterm/css/xterm.css";
 
 // A live terminal: xterm.js ↔ the server's PTY over a WebSocket. Each instance is
@@ -44,35 +45,48 @@ export function TerminalPane({ active, dark }: { active: boolean; dark: boolean 
     termRef.current = term;
     fitRef.current = fit;
 
-    const proto = location.protocol === "https:" ? "wss" : "ws";
-    const ws = new WebSocket(`${proto}://${location.host}/terminal?cols=${term.cols}&rows=${term.rows}`);
-    ws.binaryType = "arraybuffer";
-    wsRef.current = ws;
-    ws.onmessage = (ev) => {
-      if (typeof ev.data === "string") term.write(ev.data);
-      else term.write(new Uint8Array(ev.data as ArrayBuffer));
-    };
-    ws.onclose = () => term.write("\r\n\x1b[2m[session ended]\x1b[0m\r\n");
-
+    // Open the socket once the token resolves; `disposed` guards a mid-fetch
+    // unmount. Handlers read wsRef.current so they never capture a socket that
+    // isn't open yet.
     const enc = new TextEncoder();
+    let disposed = false;
+    void terminalUrl(term.cols, term.rows)
+      .then((url) => {
+        if (disposed) return;
+        const ws = new WebSocket(url);
+        ws.binaryType = "arraybuffer";
+        wsRef.current = ws;
+        ws.onmessage = (ev) => {
+          if (typeof ev.data === "string") term.write(ev.data);
+          else term.write(new Uint8Array(ev.data as ArrayBuffer));
+        };
+        ws.onclose = () => term.write("\r\n\x1b[2m[session ended]\x1b[0m\r\n");
+      })
+      .catch(() => {
+        if (!disposed) term.write("\r\n\x1b[31m[could not open terminal]\x1b[0m\r\n");
+      });
+
     const onData = term.onData((d) => {
-      if (ws.readyState === WebSocket.OPEN) ws.send(enc.encode(d));
+      const ws = wsRef.current;
+      if (ws?.readyState === WebSocket.OPEN) ws.send(enc.encode(d));
     });
 
     const resize = () => {
       try {
         fit.fit();
-        if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
+        const ws = wsRef.current;
+        if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
       } catch {}
     };
     const ro = new ResizeObserver(() => resize());
     ro.observe(host);
 
     return () => {
+      disposed = true;
       ro.disconnect();
       onData.dispose();
       try {
-        ws.close();
+        wsRef.current?.close();
       } catch {}
       term.dispose();
       termRef.current = null;
