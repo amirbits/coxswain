@@ -5,6 +5,7 @@
 import { closeSync, existsSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync, writeSync } from "node:fs";
 import { mkdir, readdir, readFile, writeFile as fsWriteFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { loadConfig } from "./config";
 import { resolveInRepo } from "./paths";
 import type { Anchor, Author, IntentPayload, Message, Thread, ThreadStatus } from "./types";
 
@@ -16,15 +17,18 @@ export class Store {
   private reviewsDir(): string {
     return join(this.root, ".reviews");
   }
-  // The project's intent doc. Prefer docs/intent/SPEC.md (the convention), fall back to
-  // a legacy root INTENT.md, and default to the former when neither exists yet.
+  // The project's intent doc. A .cox/config.json "intent" wins; otherwise prefer
+  // docs/intent/SPEC.md (the convention), fall back to a legacy root INTENT.md,
+  // and default to the former when neither exists yet.
   private static INTENT_CANDIDATES = ["docs/intent/SPEC.md", "INTENT.md"];
   intentRelPath(): string {
+    const configured = loadConfig(this.root).intent;
+    if (configured) return configured;
     for (const rel of Store.INTENT_CANDIDATES) if (existsSync(join(this.root, rel))) return rel;
     return Store.INTENT_CANDIDATES[0];
   }
   private intentPath(): string {
-    return join(this.root, this.intentRelPath());
+    return resolveInRepo(this.root, this.intentRelPath());
   }
   private fileFor(id: string): string {
     if (!/^[A-Za-z0-9_-]+$/.test(id)) throw new Error(`invalid thread id: ${id}`);
@@ -35,7 +39,7 @@ export class Store {
 
   async readIntent(): Promise<IntentPayload> {
     const path = this.intentRelPath();
-    const full = join(this.root, path);
+    const full = resolveInRepo(this.root, path);
     if (!existsSync(full)) return { content: "", exists: false, path };
     return { content: await readFile(full, "utf8"), exists: true, path };
   }

@@ -53,6 +53,25 @@ cox suggest <id> "…"    # propose a base→newText edit (--replaces)
 cox apply <id>          # write the suggestion through to the file
 ```
 
+## Configuration
+
+An optional `.cox/config.json`, committed at the repo root, lets a project shape what
+`cox context` returns instead of taking the stock projection. Every key is optional;
+no file means today's behavior:
+
+```jsonc
+{
+  "intent": "docs/vision.md",           // intent doc location (overrides the default lookup)
+  "context": {
+    "sections": ["intent", "include", "changes", "comments"],  // which blocks, in order
+    "include": ["docs/DECISIONS.md"],   // extra repo files inlined into context
+    "exclude": ["**/*.lock"]            // globs hidden from the changed-files list
+  }
+}
+```
+
+A malformed config is a loud error, not a silent fallback to defaults.
+
 ## Docs
 
 - [`docs/intent/SPEC.md`](docs/intent/SPEC.md) — what Coxswain is and does (the spec; also

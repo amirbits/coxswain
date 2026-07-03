@@ -4,6 +4,7 @@
 
 import { resolve } from "node:path";
 import { buildRegistry } from "./capabilities";
+import { isExcluded, type ContextSection, type CoxConfig } from "./config";
 import { readFileContent, repoRoot } from "./git";
 import { parseMode } from "./mode";
 import { Store } from "./store";
@@ -53,6 +54,15 @@ const HELP = `cox — agent + human CLI over the review surface
                (default)        working tree (uncommitted)
   --json   structured output      <id>  any unique prefix, like git
 
+  config: an optional .cox/config.json (committed with the repo) shapes what
+  \`cox context\` returns — every key optional, missing file = stock behavior:
+    { "intent": "docs/vision.md",              intent doc location
+      "context": {
+        "sections": ["intent", "include",      which blocks, in order
+                     "changes", "comments"],
+        "include": ["docs/DECISIONS.md"],      extra files inlined
+        "exclude": ["**/*.lock"] } }           globs hidden from changes
+
 Changes land in the working tree for review; you accept by committing.`;
 
 export async function runCli(rawArgs: string[]): Promise<number> {
@@ -80,9 +90,22 @@ export async function runCli(rawArgs: string[]): Promise<number> {
   try {
     switch (verb) {
       case "context": {
+        const cfg = await call<CoxConfig>("config", {});
+        const { sections, include, exclude } = cfg.context;
         const ws = await call<Workspace>("workspace", { mode });
-        const intent = await call<{ content: string; exists: boolean }>("getIntent", {});
-        emit(fmtContext(ws, intent), { repo: ws.repo, mode: ws.mode, intent, tree: ws.tree.filter((e) => e.status || e.open || e.outdated), openThreads: ws.threads.filter((t) => t.effectiveStatus !== "resolved") });
+        const intent = sections.includes("intent")
+          ? await call<{ content: string; exists: boolean }>("getIntent", {})
+          : null;
+        const includes = sections.includes("include")
+          ? await Promise.all(include.map(async (path) => ({ path, file: await call<FilePayload>("file", { path, mode }) })))
+          : [];
+        const data: Record<string, unknown> = { repo: ws.repo, mode: ws.mode };
+        if (intent) data.intent = intent;
+        if (includes.length) data.includes = includes.map((i) => ({ path: i.path, exists: i.file.exists, content: i.file.content }));
+        if (sections.includes("changes"))
+          data.tree = ws.tree.filter((e) => (e.status || e.open || e.outdated) && !isExcluded(e.path, exclude));
+        if (sections.includes("comments")) data.openThreads = ws.threads.filter((t) => t.effectiveStatus !== "resolved");
+        emit(fmtContext(ws, intent, cfg, includes), data);
         return 0;
       }
       case "status": {
@@ -344,19 +367,34 @@ function fmtTree(ws: Workspace, all: boolean): string {
     .join("\n");
 }
 
-function fmtContext(ws: Workspace, intent: { content: string; exists: boolean }): string {
-  const changed = ws.tree.filter((e) => e.status);
+function fmtContext(
+  ws: Workspace,
+  intent: { content: string; exists: boolean } | null,
+  cfg: CoxConfig,
+  includes: { path: string; file: FilePayload }[],
+): string {
+  const changed = ws.tree.filter((e) => e.status && !isExcluded(e.path, cfg.context.exclude));
   const open = ws.threads.filter((t) => t.effectiveStatus !== "resolved");
   const modeLabel =
     ws.mode.kind === "working" ? "working tree" : ws.mode.kind === "branch" ? `${ws.mode.ref}...HEAD` : `${ws.mode.ref}..HEAD`;
+  const rule = (label: string, tail = "") => `\n── ${label} ${"─".repeat(Math.max(2, 40 - label.length))}${tail}\n`;
+  const blocks: Record<ContextSection, () => string> = {
+    intent: () => rule("intent") + `${intent?.exists ? intent.content.trim() : "(no intent doc yet)"}\n`,
+    include: () =>
+      includes
+        .map(({ path, file }) => rule(path) + (file.exists ? (file.kind === "binary" ? "(binary)" : file.content.trim()) : "(missing)") + "\n")
+        .join(""),
+    changes: () =>
+      rule(`changes (${modeLabel})`, `  ${changed.length} file(s)`) +
+      (changed.length ? changed.map((e) => ` ${e.status}  ${e.path}`).join("\n") : "  (none)") +
+      "\n  → cox diff [path] for the diff\n",
+    comments: () =>
+      rule("open comments", `  ${open.length}`) +
+      (open.length
+        ? open.map((t) => ` ${GLYPH[t.effectiveStatus] ?? "•"} ${short(t.id)} ${where(t)}  "${oneLine(t.thread[t.thread.length - 1].body, 40)}"`).join("\n")
+        : "  (none)"),
+  };
   let o = `repo:   ${ws.repo.name}\nbranch: ${ws.repo.branch}${ws.repo.head ? ` @ ${ws.repo.head.slice(0, 7)}` : ""}\n`;
-  o += `\n── intent ──────────────────────────────\n${intent.exists ? intent.content.trim() : "(no intent doc yet)"}\n`;
-  o += `\n── changes (${modeLabel}) ─────────────────  ${changed.length} file(s)\n`;
-  o += (changed.length ? changed.map((e) => ` ${e.status}  ${e.path}`).join("\n") : "  (none)") + "\n";
-  o += `  → cox diff [path] for the diff\n`;
-  o += `\n── open comments ───────────────────────  ${open.length}\n`;
-  o += open.length
-    ? open.map((t) => ` ${GLYPH[t.effectiveStatus] ?? "•"} ${short(t.id)} ${where(t)}  "${oneLine(t.thread[t.thread.length - 1].body, 40)}"`).join("\n")
-    : "  (none)";
-  return o;
+  o += cfg.context.sections.map((s) => blocks[s]()).join("");
+  return o.replace(/\n+$/, "");
 }

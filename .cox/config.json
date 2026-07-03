@@ -1,0 +1,6 @@
+{
+  "context": {
+    "include": ["docs/DECISIONS.md"],
+    "exclude": ["bun.lock", "**/assets.generated.ts"]
+  }
+}

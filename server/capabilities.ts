@@ -1,6 +1,7 @@
 // The v1 capabilities, registered onto a Registry. Shared by the UI, the HTTP
 // API, and the CLI (see docs/intent/SPEC.md). Diff modes are normalized here.
 
+import { loadConfig } from "./config";
 import { diffAll, gitFetch, gitStatus, gitTopology, status } from "./git";
 import { parseMode } from "./mode";
 import { Registry } from "./registry";
@@ -15,6 +16,7 @@ export function buildRegistry(deps: { root: string; store: Store }): Registry {
   const reg = new Registry();
 
   // Projections
+  reg.register("config", "Project config (.cox/config.json), parsed with defaults", () => loadConfig(root));
   reg.register("workspace", "Explorer tree + repo info + all threads", (a: any) => getWorkspace(root, store, asMode(a?.mode)));
   reg.register("file", "A file's current content + its per-mode diff", (a: any) => getFile(root, store, String(a.path), asMode(a?.mode)));
   reg.register("showDiff", "Whole-repo diff for a mode", (a: any) => diffAll(root, asMode(a?.mode)));
