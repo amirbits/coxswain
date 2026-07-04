@@ -77,3 +77,8 @@ A malformed config is a loud error, not a silent fallback to defaults.
 - [`docs/intent/SPEC.md`](docs/intent/SPEC.md) — what Coxswain is and does (the spec; also
   the in-app intent doc).
 - [`docs/DECISIONS.md`](docs/DECISIONS.md) — the decisions, and why.
+
+## License
+
+Source-available: free to use, run, and redistribute verbatim — no modification or
+derivative works. See [`LICENSE`](LICENSE).
