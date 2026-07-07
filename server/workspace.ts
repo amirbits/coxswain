@@ -4,20 +4,29 @@
 // (see docs/intent/SPEC.md).
 
 import { basename } from "node:path";
-import { changedFiles, diffFile, fileStatus, listFiles, listRefs, readFileContent, status } from "./git";
+import { changedFiles, diffFile, fileStatus, inScope, keepPath, listFiles, listRefs, readFileContent, status } from "./git";
 import { decorateThreads } from "./review";
 import type { Store } from "./store";
 import type { DiffMode, FilePayload, TreeEntry, Workspace } from "./types";
 
-export async function getWorkspace(root: string, store: Store, mode: DiffMode): Promise<Workspace> {
+// `scope` is a repo-relative subdir the view is focused on ("" = whole repo).
+// The file tree and change badges are scoped to it; branch topology stays global
+// (a branch is a repo-wide fact), and `elsewhere` counts the working-tree changes
+// outside the scope so the view never hides that the repo is dirty (see
+// docs/intent/SPEC.md).
+export async function getWorkspace(root: string, store: Store, mode: DiffMode, scope = ""): Promise<Workspace> {
   const [st, files, refs, changed, rawThreads] = await Promise.all([
     status(root),
-    listFiles(root),
+    listFiles(root, scope),
     listRefs(root),
-    changedFiles(root, mode),
+    changedFiles(root, mode, scope),
     store.listThreads(),
   ]);
   const threads = await decorateThreads(rawThreads, root);
+
+  const elsewhere = new Set(
+    st.files.map((f) => f.path).filter((p) => keepPath(p) && !inScope(p, scope)),
+  ).size;
 
   const counts: Record<string, { open: number; outdated: number }> = {};
   for (const t of threads) {
@@ -36,7 +45,7 @@ export async function getWorkspace(root: string, store: Store, mode: DiffMode): 
   }));
 
   return {
-    repo: { root, name: basename(root), intentPath: store.intentRelPath(), branch: st.branch, head: st.head, upstream: st.upstream, ahead: st.ahead, behind: st.behind, refs },
+    repo: { root, name: basename(root), scope, elsewhere, intentPath: store.intentRelPath(), branch: st.branch, head: st.head, upstream: st.upstream, ahead: st.ahead, behind: st.behind, refs },
     mode,
     tree,
     threads,

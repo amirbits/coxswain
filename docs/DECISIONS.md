@@ -26,3 +26,10 @@ Why things are the way they are. One line each; reverse only with care.
   terminal needs bidirectional bytes.
 - **In-repo `.reviews/` over a sidecar store.** Plain files the agent reads with zero
   extra API; revisit only if comment churn hurts.
+- **Scope is a filter over the repo root, never a second root.** The git root (toplevel)
+  stays the anchor for all plumbing and path safety; the launch/CWD subdir is a `scope`
+  pathspec that narrows only the file tree + change badges + the "All changes" diff. Branch
+  and ahead/behind stay repo-wide (they have no subtree meaning), and a scoped view always
+  reports the count of working-tree changes *elsewhere* — the index is global, so it must
+  never hide that the repo is dirty. The CLI scopes to the agent's CWD for the same reason;
+  `--repo` (CLI) / the scope chip (UI) widen back to the whole repository.

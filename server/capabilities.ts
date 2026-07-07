@@ -2,7 +2,7 @@
 // API, and the CLI (see docs/intent/SPEC.md). Diff modes are normalized here.
 
 import { loadConfig } from "./config";
-import { diffAll, gitFetch, gitStatus, gitTopology, status } from "./git";
+import { cleanScope, diffAll, gitFetch, gitStatus, gitTopology, status } from "./git";
 import { parseMode } from "./mode";
 import { Registry } from "./registry";
 import { decorateThreads } from "./review";
@@ -10,6 +10,7 @@ import type { Store } from "./store";
 import { getFile, getWorkspace } from "./workspace";
 
 const asMode = (m: any) => parseMode(m);
+const asScope = (s: any) => cleanScope(typeof s === "string" ? s : "");
 
 export function buildRegistry(deps: { root: string; store: Store }): Registry {
   const { root, store } = deps;
@@ -17,9 +18,9 @@ export function buildRegistry(deps: { root: string; store: Store }): Registry {
 
   // Projections
   reg.register("config", "Project config (.cox/config.json), parsed with defaults", () => loadConfig(root));
-  reg.register("workspace", "Explorer tree + repo info + all threads", (a: any) => getWorkspace(root, store, asMode(a?.mode)));
+  reg.register("workspace", "Explorer tree + repo info + all threads (scope: repo-relative subdir)", (a: any) => getWorkspace(root, store, asMode(a?.mode), asScope(a?.scope)));
   reg.register("file", "A file's current content + its per-mode diff", (a: any) => getFile(root, store, String(a.path), asMode(a?.mode)));
-  reg.register("showDiff", "Whole-repo diff for a mode", (a: any) => diffAll(root, asMode(a?.mode)));
+  reg.register("showDiff", "Whole-repo (or scoped) diff for a mode", (a: any) => diffAll(root, asMode(a?.mode), asScope(a?.scope)));
   reg.register("getIntent", "Read the intent doc", () => store.readIntent());
   reg.register("writeIntent", "Write the intent doc (write-through)", async (a: any) => {
     await store.writeIntent(String(a.content ?? ""));

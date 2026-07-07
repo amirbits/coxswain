@@ -1,9 +1,9 @@
 // git CLI adapter. Coxswain holds no authoritative state — every fact about history,
 // diff, branch, and file content is read from git / the filesystem on demand.
 
-import { existsSync, statSync } from "node:fs";
+import { existsSync, realpathSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { resolveInRepo } from "./paths";
 import type {
   ChangeStatus,
@@ -20,8 +20,19 @@ import type {
 
 type GitResult = { ok: boolean; stdout: string; stderr: string; code: number };
 
-// Comment threads are their own truth (the Review panel), kept out of the diff.
-const EXCLUDE_REVIEWS = ["--", ".", ":(exclude).reviews"];
+// The pathspec for a diff/status read: restrict to `scope` (a repo-relative
+// subdir, "" = whole repo) and always keep comment threads out — they're the
+// Review panel's truth, not repo content. `scope || "."` means the scope="" case
+// is byte-identical to the old whole-repo behavior.
+function scopedSpec(scope: string): string[] {
+  return ["--", scope || ".", ":(exclude).reviews"];
+}
+
+// The pathspec tail for an ls-files read (which has no .reviews to exclude —
+// keepPath filters that): just the scope dir, or nothing for the whole repo.
+function scopeSpec(scope: string): string[] {
+  return scope ? ["--", scope] : [];
+}
 
 export async function git(cwd: string, args: string[]): Promise<GitResult> {
   const proc = Bun.spawn(["git", ...args], { cwd, stdout: "pipe", stderr: "pipe", stdin: "ignore" });
@@ -199,11 +210,14 @@ export async function gitFetch(root: string, remote?: string | null): Promise<Gi
   return gitStatus(root);
 }
 
-// Tracked + untracked (non-ignored) files, minus .reviews/.
-export async function listFiles(root: string): Promise<string[]> {
+// Tracked + untracked (non-ignored) files, minus .reviews/. `scope` (a
+// repo-relative subdir, "" = whole repo) narrows the listing via a pathspec — so
+// a big monorepo doesn't materialize its entire ls-files just to show one package.
+export async function listFiles(root: string, scope = ""): Promise<string[]> {
+  const spec = scopeSpec(scope);
   const [tracked, untracked] = await Promise.all([
-    git(root, ["ls-files", "-z"]),
-    git(root, ["ls-files", "--others", "--exclude-standard", "-z"]),
+    git(root, ["ls-files", "-z", ...spec]),
+    git(root, ["ls-files", "--others", "--exclude-standard", "-z", ...spec]),
   ]);
   const set = new Set<string>();
   for (const f of tracked.stdout.split("\0")) if (keepPath(f)) set.add(f);
@@ -211,8 +225,36 @@ export async function listFiles(root: string): Promise<string[]> {
   return [...set].sort();
 }
 
-function keepPath(f: string): boolean {
+export function keepPath(f: string): boolean {
   return !!f && !f.startsWith(".reviews/") && f !== ".reviews";
+}
+
+// Whether a repo-relative path sits inside `scope` ("" = whole repo).
+export function inScope(path: string, scope: string): boolean {
+  return !scope || path === scope || path.startsWith(scope + "/");
+}
+
+// Normalize a scope string from any front door (query param, CLI, registry arg)
+// into a clean repo-relative subdir, or "" for the whole repo. It only ever
+// becomes a git pathspec, but a leading "/" or a ".." segment would be nonsense —
+// collapse those to whole-repo rather than surprise the caller.
+export function cleanScope(s: string): string {
+  const t = (s ?? "").replace(/^\/+|\/+$/g, "");
+  if (!t || t === "." || t.split("/").some((seg) => seg === "..")) return "";
+  return t;
+}
+
+// The repo-relative subdir `cwd` sits in, relative to the git toplevel `root`.
+// Realpath both before diffing them: a symlinked cwd (or a not-yet-canonical
+// root) would otherwise yield a bogus "../…". Anything escaping the repo → "".
+export function scopeFromCwd(root: string, cwd: string): string {
+  try {
+    const rel = relative(realpathSync(root), realpathSync(cwd));
+    if (!rel || rel.startsWith("..") || isAbsolute(rel)) return "";
+    return cleanScope(rel.split(sep).join("/"));
+  } catch {
+    return "";
+  }
 }
 
 // The git range args for a mode (target is HEAD/working; see DiffMode).
@@ -223,10 +265,11 @@ function rangeArgs(mode: DiffMode, head: string | null): string[] {
   return [`${mode.ref}..HEAD`]; // vs a commit / tag
 }
 
-// Changed files in a mode → path -> status letter (A/M/D/R/C).
-export async function changedFiles(root: string, mode: DiffMode): Promise<Record<string, ChangeStatus>> {
+// Changed files in a mode → path -> status letter (A/M/D/R/C). `scope` narrows to
+// a subdir ("" = whole repo).
+export async function changedFiles(root: string, mode: DiffMode, scope = ""): Promise<Record<string, ChangeStatus>> {
   const head = await headSha(root);
-  const r = await git(root, ["diff", "--name-status", ...rangeArgs(mode, head), ...EXCLUDE_REVIEWS]);
+  const r = await git(root, ["diff", "--name-status", ...rangeArgs(mode, head), ...scopedSpec(scope)]);
   const map: Record<string, ChangeStatus> = {};
   for (const line of r.stdout.split("\n")) {
     if (!line) continue;
@@ -236,7 +279,7 @@ export async function changedFiles(root: string, mode: DiffMode): Promise<Record
     if (path) map[path] = code;
   }
   if (mode.kind === "working") {
-    const u = await git(root, ["ls-files", "--others", "--exclude-standard", "-z"]);
+    const u = await git(root, ["ls-files", "--others", "--exclude-standard", "-z", ...scopeSpec(scope)]);
     for (const f of u.stdout.split("\0")) if (keepPath(f)) map[f] = "A";
   }
   return map;
@@ -256,13 +299,14 @@ export async function fileStatus(root: string, path: string, mode: DiffMode): Pr
   return null;
 }
 
-// Whole-repo diff for a mode (used by the CLI and the "all changes" view).
-export async function diffAll(root: string, mode: DiffMode): Promise<DiffPayload> {
+// Whole-repo (or scoped) diff for a mode (used by the CLI and the "all changes"
+// view). `scope` narrows to a subdir ("" = whole repo).
+export async function diffAll(root: string, mode: DiffMode, scope = ""): Promise<DiffPayload> {
   const head = await headSha(root);
   if (mode.ref && !(await refExists(root, mode.ref))) throw new Error(`ref not found: ${mode.ref}`);
-  const r = await git(root, ["diff", "--no-color", "--no-ext-diff", ...rangeArgs(mode, head), ...EXCLUDE_REVIEWS]);
+  const r = await git(root, ["diff", "--no-color", "--no-ext-diff", ...rangeArgs(mode, head), ...scopedSpec(scope)]);
   let raw = r.stdout;
-  if (mode.kind === "working") raw += await untrackedDiff(root);
+  if (mode.kind === "working") raw += await untrackedDiff(root, scope);
   return { raw, mode, head };
 }
 
@@ -285,9 +329,9 @@ export async function diffFile(root: string, path: string, mode: DiffMode): Prom
   return "";
 }
 
-async function untrackedDiff(root: string): Promise<string> {
+async function untrackedDiff(root: string, scope = ""): Promise<string> {
   try {
-    const r = await git(root, ["ls-files", "--others", "--exclude-standard", "-z"]);
+    const r = await git(root, ["ls-files", "--others", "--exclude-standard", "-z", ...scopeSpec(scope)]);
     if (!r.ok) return "";
     const files = r.stdout.split("\0").filter((f) => keepPath(f));
     if (files.length > 100) console.warn(`cox: ${files.length} untracked files; diffing the first 100 (use 'git add' to stage the rest).`);

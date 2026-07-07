@@ -5,7 +5,7 @@
 import { resolve } from "node:path";
 import { buildRegistry } from "./capabilities";
 import { isExcluded, type ContextSection, type CoxConfig } from "./config";
-import { readFileContent, repoRoot } from "./git";
+import { readFileContent, repoRoot, scopeFromCwd } from "./git";
 import { parseMode } from "./mode";
 import { Store } from "./store";
 import type { DecoratedThread, DiffMode, FilePayload, Suggestion, Workspace } from "./types";
@@ -14,6 +14,7 @@ type Flags = {
   _: string[];
   json?: boolean;
   all?: boolean;
+  repo?: boolean;
   stdin?: boolean;
   diff?: boolean;
   replaces?: string; // suggest: the exact text a proposal replaces
@@ -35,7 +36,7 @@ const HELP = `cox — agent + human CLI over the review surface
   cox intent                print the intent doc
   cox tree [--all]          file explorer: changed + commented files (--all = every file)
   cox file <path>           print a file's current content
-  cox diff [path]           diff (whole repo, or one file)
+  cox diff [path]           diff (current scope, or one file)
   cox comments [--all]      list review threads (default: open + outdated)
   cox show <id>             one thread in full (messages + any suggestion)
   cox comment <path> <line> open a thread as the agent (--end <line> for a range;
@@ -52,6 +53,12 @@ const HELP = `cox — agent + human CLI over the review surface
   diff modes:  --branch <ref>   merge-request diff (ref...HEAD)
                --ref|--tag <r>  vs a commit or tag (r..HEAD)
                (default)        working tree (uncommitted)
+
+  scope: tree / diff / context are scoped to the directory you run cox in (its
+  subtree of the repo) — the win for large monorepos. Branch + ahead/behind stay
+  repo-wide, and a scoped view still reports changes elsewhere. --repo widens any
+  command back to the whole repository.
+
   --json   structured output      <id>  any unique prefix, like git
 
   config: an optional .cox/config.json (committed with the repo) shapes what
@@ -80,6 +87,9 @@ export async function runCli(rawArgs: string[]): Promise<number> {
     console.error(`cox: ${cwd} is not a git repository.`);
     return 1;
   }
+  // Scope to the directory the agent is working in (parity with the UI's launch
+  // scope), unless --repo widens back to the whole repository.
+  const scope = flags.repo ? "" : scopeFromCwd(root, cwd);
 
   const store = new Store(root);
   const registry = buildRegistry({ root, store });
@@ -92,7 +102,7 @@ export async function runCli(rawArgs: string[]): Promise<number> {
       case "context": {
         const cfg = await call<CoxConfig>("config", {});
         const { sections, include, exclude } = cfg.context;
-        const ws = await call<Workspace>("workspace", { mode });
+        const ws = await call<Workspace>("workspace", { mode, scope });
         const intent = sections.includes("intent")
           ? await call<{ content: string; exists: boolean }>("getIntent", {})
           : null;
@@ -119,7 +129,7 @@ export async function runCli(rawArgs: string[]): Promise<number> {
         return 0;
       }
       case "tree": {
-        const ws = await call<Workspace>("workspace", { mode });
+        const ws = await call<Workspace>("workspace", { mode, scope });
         emit(fmtTree(ws, !!flags.all), flags.all ? ws.tree : ws.tree.filter((e) => e.status || e.open || e.outdated));
         return 0;
       }
@@ -139,7 +149,7 @@ export async function runCli(rawArgs: string[]): Promise<number> {
           const f = await call<FilePayload>("file", { path: flags._[0], mode });
           emit(f.diff.trim() || "(no changes)", f);
         } else {
-          const d = await call<{ raw: string }>("showDiff", { mode });
+          const d = await call<{ raw: string }>("showDiff", { mode, scope });
           emit(d.raw.trim() || "(no changes)", d);
         }
         return 0;
@@ -231,6 +241,7 @@ function parseFlags(args: string[]): Flags {
     const a = args[i];
     if (a === "--json") f.json = true;
     else if (a === "--all") f.all = true;
+    else if (a === "--repo") f.repo = true;
     else if (a === "--stdin") f.stdin = true;
     else if (a === "--diff") f.diff = true;
     else if (a === "--replaces") f.replaces = args[++i];
@@ -355,16 +366,27 @@ function fmtStatus(s: StatusShape): string {
   );
 }
 
+function scopeNote(ws: Workspace): string {
+  const parts: string[] = [];
+  if (ws.repo.scope) parts.push(`scope: ${ws.repo.scope}/`);
+  if (ws.repo.elsewhere) parts.push(`${ws.repo.elsewhere} changed elsewhere (--repo to widen)`);
+  return parts.length ? parts.join(" · ") + "\n" : "";
+}
+
 function fmtTree(ws: Workspace, all: boolean): string {
   const entries = all ? ws.tree : ws.tree.filter((e) => e.status || e.open || e.outdated);
-  if (!entries.length) return all ? "(empty)" : "No changed or commented files. (cox tree --all)";
-  return entries
-    .map((e) => {
-      const st = e.status ? e.status : " ";
-      const badge = e.open || e.outdated ? `  💬${e.open}${e.outdated ? `+${e.outdated}!` : ""}` : "";
-      return ` ${st}  ${e.path}${badge}`;
-    })
-    .join("\n");
+  const head = scopeNote(ws);
+  if (!entries.length) return head + (all ? "(empty)" : "No changed or commented files here. (cox tree --all)");
+  return (
+    head +
+    entries
+      .map((e) => {
+        const st = e.status ? e.status : " ";
+        const badge = e.open || e.outdated ? `  💬${e.open}${e.outdated ? `+${e.outdated}!` : ""}` : "";
+        return ` ${st}  ${e.path}${badge}`;
+      })
+      .join("\n")
+  );
 }
 
 function fmtContext(
@@ -395,6 +417,7 @@ function fmtContext(
         : "  (none)"),
   };
   let o = `repo:   ${ws.repo.name}\nbranch: ${ws.repo.branch}${ws.repo.head ? ` @ ${ws.repo.head.slice(0, 7)}` : ""}\n`;
+  if (ws.repo.scope) o += `scope:  ${ws.repo.scope}/${ws.repo.elsewhere ? `  (${ws.repo.elsewhere} changed elsewhere; cox --repo to widen)` : ""}\n`;
   o += cfg.context.sections.map((s) => blocks[s]()).join("");
   return o.replace(/\n+$/, "");
 }

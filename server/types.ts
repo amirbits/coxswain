@@ -66,6 +66,8 @@ export type TreeEntry = {
 export type RepoInfo = {
   root: string;
   name: string;
+  scope: string; // repo-relative subdir the view is focused on ("" = whole repo)
+  elsewhere: number; // working-tree changes outside the scope (0 when scope is "")
   intentPath: string; // repo-relative path of the pinned intent doc
   branch: string;
   head: string | null;

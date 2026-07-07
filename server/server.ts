@@ -8,7 +8,7 @@ import { getEmbedded, hasEmbedded } from "./assets";
 import { buildRegistry } from "./capabilities";
 import { parseMode } from "./mode";
 import { SSEHub } from "./sse";
-import { diffAll } from "./git";
+import { cleanScope, diffAll } from "./git";
 import { Store } from "./store";
 import { closeTerminal, openTerminal, terminalMessage, type TermData } from "./terminal";
 import type { DiffMode } from "./types";
@@ -20,12 +20,14 @@ export type ServerOptions = {
   port: number;
   dev: boolean;
   defaultBase: string | null;
+  scope?: string; // repo-relative launch subdir; the default view scope ("" = whole repo)
 };
 
 const DIST_DIR = join(import.meta.dir, "../web/dist");
 
 export async function startServer(opts: ServerOptions) {
   const { root } = opts;
+  const scope = opts.scope ?? "";
   const store = new Store(root);
   const registry = buildRegistry({ root, store });
 
@@ -86,13 +88,13 @@ export async function startServer(opts: ServerOptions) {
 
       if (pathname === "/api/health") return json({ ok: true, root });
 
-      if (pathname === "/api/boot") return json({ mode: bootMode, root, token });
+      if (pathname === "/api/boot") return json({ mode: bootMode, root, token, scope });
 
       if (pathname === "/api/registry") return json(registry.list());
 
       if (pathname === "/api/workspace") {
         try {
-          return json(await getWorkspace(root, store, modeFromQuery(url)));
+          return json(await getWorkspace(root, store, modeFromQuery(url), scopeFromQuery(url, scope)));
         } catch (e) {
           return json({ error: errMsg(e) }, 400);
         }
@@ -110,7 +112,7 @@ export async function startServer(opts: ServerOptions) {
 
       if (pathname === "/api/changes") {
         try {
-          return json(await diffAll(root, modeFromQuery(url)));
+          return json(await diffAll(root, modeFromQuery(url), scopeFromQuery(url, scope)));
         } catch (e) {
           return json({ error: errMsg(e) }, 400);
         }
@@ -189,6 +191,13 @@ async function serveStatic(pathname: string): Promise<Response> {
 
 function modeFromQuery(url: URL): DiffMode {
   return parseMode({ kind: url.searchParams.get("mode"), ref: url.searchParams.get("ref") });
+}
+
+// The requested view scope, defaulting to the launch scope when unset. The client
+// sends `scope=` (empty) to mean the whole repo, so an *absent* param — not an
+// empty one — is what falls back. Sanitized because it becomes a git pathspec.
+function scopeFromQuery(url: URL, fallback: string): string {
+  return url.searchParams.has("scope") ? cleanScope(url.searchParams.get("scope") ?? "") : fallback;
 }
 
 // The browser attaches an Origin to cross-origin WebSocket handshakes and to

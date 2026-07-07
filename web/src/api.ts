@@ -4,7 +4,7 @@
 
 import type { DiffMode, FilePayload, GitStatus, GitTopology, Workspace } from "./types";
 
-export type BootPayload = { mode: DiffMode; root: string; token: string };
+export type BootPayload = { mode: DiffMode; root: string; token: string; scope: string };
 export type RegistrySpec = { name: string; description: string };
 
 // The per-boot token authorizing the PTY and mutating calls. Fetched once from
@@ -27,10 +27,14 @@ async function authToken(): Promise<string> {
   return (await boot()).token ?? "";
 }
 
-function modeParams(mode: DiffMode): string {
+// mode (+ optional scope) as a query string. Scope is always sent when provided
+// — including the empty string, which the server reads as "the whole repo" (an
+// absent param would instead fall back to the launch scope).
+function viewParams(mode: DiffMode, scope?: string): string {
   const p = new URLSearchParams();
   p.set("mode", mode.kind);
   if (mode.ref) p.set("ref", mode.ref);
+  if (scope !== undefined) p.set("scope", scope);
   return p.toString();
 }
 
@@ -44,23 +48,23 @@ export async function fetchRegistry(): Promise<RegistrySpec[]> {
   return res.json();
 }
 
-export async function fetchWorkspace(mode: DiffMode): Promise<Workspace> {
-  const res = await fetch(`/api/workspace?${modeParams(mode)}`);
+export async function fetchWorkspace(mode: DiffMode, scope?: string): Promise<Workspace> {
+  const res = await fetch(`/api/workspace?${viewParams(mode, scope)}`);
   if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error || `workspace ${res.status}`);
   return res.json();
 }
 
 export type ChangesPayload = { raw: string; mode: DiffMode; head: string | null };
 
-// The whole-changeset diff for the active mode (the continuous "All changes" view).
-export async function fetchChanges(mode: DiffMode): Promise<ChangesPayload> {
-  const res = await fetch(`/api/changes?${modeParams(mode)}`);
+// The changeset diff for the active mode + scope (the continuous "All changes" view).
+export async function fetchChanges(mode: DiffMode, scope?: string): Promise<ChangesPayload> {
+  const res = await fetch(`/api/changes?${viewParams(mode, scope)}`);
   if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error || `changes ${res.status}`);
   return res.json();
 }
 
 export async function fetchFile(path: string, mode: DiffMode): Promise<FilePayload> {
-  const res = await fetch(`/api/file?path=${encodeURIComponent(path)}&${modeParams(mode)}`);
+  const res = await fetch(`/api/file?path=${encodeURIComponent(path)}&${viewParams(mode)}`);
   if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error || `file ${res.status}`);
   return res.json();
 }
