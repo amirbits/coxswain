@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { DecoratedThread } from "../types";
 import { ThreadCard, type ThreadActions } from "./ThreadCard";
 
@@ -28,6 +29,10 @@ export function ReviewPanel({
   const sorted = [...threads].sort((a, b) => ORDER[a.effectiveStatus] - ORDER[b.effectiveStatus]);
   const visible = showResolved ? sorted : sorted.filter((t) => t.effectiveStatus !== "resolved");
 
+  // Panel-wide collapse toggle. Each ThreadCard follows this default but keeps a
+  // local override until the next panel-wide flip.
+  const [allCollapsed, setAllCollapsed] = useState(false);
+
   return (
     <aside className="review-panel">
       <div className="panel-head">
@@ -36,6 +41,11 @@ export function ReviewPanel({
           {open} open{outdated ? ` · ${outdated} outdated` : ""}
         </span>
         <span className="spacer" />
+        {visible.length > 0 && (
+          <button className="btn small ghost" onClick={() => setAllCollapsed((c) => !c)} title={allCollapsed ? "Expand all threads" : "Collapse all threads"}>
+            {allCollapsed ? "expand all" : "collapse all"}
+          </button>
+        )}
         {resolved > 0 && (
           <button className="btn small ghost" onClick={onToggleResolved}>
             {showResolved ? "hide resolved" : `show resolved (${resolved})`}
@@ -68,6 +78,7 @@ export function ReviewPanel({
               actions={actions}
               active={t.id === activeThreadId}
               onFocus={() => onFocus(t.id)}
+              defaultCollapsed={allCollapsed}
             />
           ))}
         </div>

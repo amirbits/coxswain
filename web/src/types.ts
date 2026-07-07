@@ -34,6 +34,8 @@ export type TreeEntry = { path: string; status: ChangeStatus; open: number; outd
 export type RepoInfo = {
   root: string;
   name: string;
+  scope: string; // repo-relative subdir the view is focused on ("" = whole repo)
+  elsewhere: number; // working-tree changes outside the scope
   intentPath: string;
   branch: string;
   head: string | null;

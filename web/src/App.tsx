@@ -24,6 +24,10 @@ export default function App() {
   const [changes, setChanges] = useState<{ raw: string; mode: DiffMode } | null>(null);
   const [paneByPath, setPaneByPath] = useState<Record<string, "file" | "diff">>({});
   const [mode, setMode] = useState<DiffMode>({ kind: "working" });
+  // The repo-relative subdir the view is focused on. `undefined` until boot
+  // resolves it — while undefined we send no scope param, so the server applies
+  // the launch scope. After that it's an explicit string ("" = whole repo).
+  const [scope, setScope] = useState<string | undefined>(undefined);
   const [pendingKind, setPendingKind] = useState<DiffMode["kind"]>("working");
   const [refInput, setRefInput] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -62,6 +66,8 @@ export default function App() {
 
   const modeRef = useRef(mode);
   modeRef.current = mode;
+  const scopeRef = useRef(scope);
+  scopeRef.current = scope;
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
   const activeKeyRef = useRef(activeKey);
@@ -82,7 +88,7 @@ export default function App() {
   // --- loaders ---
 
   const loadChanges = useCallback(async () => {
-    const c = await fetchChanges(modeRef.current);
+    const c = await fetchChanges(modeRef.current, scopeRef.current);
     setChanges({ raw: c.raw, mode: c.mode });
   }, []);
 
@@ -128,7 +134,7 @@ export default function App() {
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(async () => {
         try {
-          const w = await fetchWorkspace(modeRef.current);
+          const w = await fetchWorkspace(modeRef.current, scopeRef.current);
           setWs(w);
           setError(null);
 
@@ -180,9 +186,17 @@ export default function App() {
         setMode(b.mode);
         setPendingKind(b.mode.kind);
         if (b.mode.ref) setRefInput(b.mode.ref);
+        setScope(b.scope ?? "");
       })
       .catch(() => {});
   }, []);
+
+  // Re-project when the focus scope changes (widen/narrow from the explorer).
+  useEffect(() => {
+    if (scope !== undefined) refetch();
+  }, [scope, refetch]);
+
+  const onScope = useCallback((next: string) => setScope(next), []);
 
   // Git source-control panel: status on every change, topology on mount + fetch.
   const loadGitStatus = useCallback(() => {
@@ -347,6 +361,7 @@ export default function App() {
   const paletteActions = [
     { id: "open-changes", label: "Open: All changes", run: openChanges },
     { id: "new-terminal", label: "New terminal", run: openTerminal },
+    ...(ws.repo.scope ? [{ id: "scope-repo", label: "Scope: whole repository", run: () => onScope("") }] : []),
     { id: "open-intent", label: "Open intent", run: () => openFile(ws.repo.intentPath) },
     { id: "toggle-explorer", label: "Toggle Files pane", run: () => setShowExplorer((s) => !s) },
     { id: "toggle-source", label: "Toggle Source Control pane", run: () => setShowSource((s) => !s) },
@@ -395,6 +410,15 @@ export default function App() {
             </span>
           )}
           {ws.repo.head && <span className="sha">{ws.repo.head.slice(0, 7)}</span>}
+          {ws.repo.scope && (
+            <button
+              className="scope-chip"
+              onClick={() => onScope("")}
+              title={`Focused on ${ws.repo.scope}/${ws.repo.elsewhere ? ` — ${ws.repo.elsewhere} changed elsewhere` : ""}. Click to view the whole repo.`}
+            >
+              ▸ {ws.repo.scope}/{ws.repo.elsewhere > 0 && <span className="scope-elsewhere">+{ws.repo.elsewhere}</span>}
+            </button>
+          )}
         </div>
 
         <div className="mode-bar">
@@ -477,7 +501,18 @@ export default function App() {
         )}
         {showExplorer && (
           <div className="col explorer-col">
-            <Explorer tree={ws.tree} intentPath={ws.repo.intentPath} activeKey={activePath} changesActive={activeKey === CHANGES_KEY} onSelect={openFile} onOpenChanges={openChanges} onNewTerminal={openTerminal} />
+            <Explorer
+              tree={ws.tree}
+              intentPath={ws.repo.intentPath}
+              scope={ws.repo.scope}
+              elsewhere={ws.repo.elsewhere}
+              onScope={onScope}
+              activeKey={activePath}
+              changesActive={activeKey === CHANGES_KEY}
+              onSelect={openFile}
+              onOpenChanges={openChanges}
+              onNewTerminal={openTerminal}
+            />
           </div>
         )}
 
